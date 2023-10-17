@@ -1,101 +1,143 @@
 <div align="center">
 
-# **Bittensor Subnet Template** <!-- omit in toc -->
+---
+# Storage Subnet on Bittensor <!-- omit in toc -->
+
+[Discord](https://discord.gg/bittensor) • [Network](https://taostats.io/) • [Research](https://bittensor.com/whitepaper)
+---
 [![Discord Chat](https://img.shields.io/discord/308323056592486420.svg)](https://discord.gg/bittensor)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 
----
-
-## The Incentivized Internet <!-- omit in toc -->
-
-[Discord](https://discord.gg/bittensor) • [Network](https://taostats.io/) • [Research](https://bittensor.com/whitepaper)
 </div>
 
----
-- [Quickstarter template](#quickstarter-template)
-- [Introduction](#introduction)
-  - [Example](#example)
-- [Installation](#installation)
-  - [Before you proceed](#before-you-proceed)
-  - [Install](#install)
-- [Writing your own incentive mechanism](#writing-your-own-incentive-mechanism)
-- [License](#license)
+# 1. Introduction
 
----
-## Quickstarter template
+Bittensor aims to revolutionize the AI landscape by providing a decentralized network where nodes can share machine learning resources. This document outlines the process of designing, implementing, and deploying a specialized storage subnet within the Bittensor network, inspired by Filecoin and IPFS.
 
-This template contains all the required installation instructions, scripts, and files and functions for:
-- Building Bittensor subnets.
-- Creating custom incentive mechanisms and running these mechanisms on the subnets. 
+# 2. System Overview
 
----
+## 2.1 Bittensor Network
 
-## Introduction
+Bittensor is a decentralized network that facilitates the sharing of machine learning resources. It operates as a Peer-to-Peer Intelligence Market, where intelligence is priced by other intelligence systems across the internet. The network uses a digital ledger to record ranks and provide incentives in a decentralized way.
 
-**IMPORTANT**: If you are new to Bittensor subnets, read this section before proceeding to [Installation](#installation) section. 
+## 2.2 Storage Subnet
 
-The Bittensor blockchain hosts multiple self-contained incentive mechanisms called **subnets**. Subnets are playing fields in which miners, those producing value, and validators, those producing consensus, determine together the proper distribution of TAO for the purpose of incentivizing the creation of value, i.e., generating digital commodities, such as intelligence or data. 
+The storage subnet will allow nodes to contribute storage space, employing a prototype incentive mechanism similar to Filecoin. It will offer decentralized storage solutions, allowing nodes to serve their hard drive space to the network, proven to validators utilizing Yuma consensus.
 
-Each subnet consists of:
-- A wire protocol through which miners and validators interact.
-- The method of interactions of miners and validators with Bittensor's chain consensus engine [Yuma Consensus](https://bittensor.com/documentation/validating/yuma-consensus). The Yuma Consensus is designed to drive these actors, validators and miners, into agreement on who is creating value. 
+# 3. Design
 
-When you are ready to write your own custom incentive mechanism, start with this starter template repository. It is preloaded with all the files you need to run a very simple incentive mechanism. This simple incentive mechanism rewards miners for responding with the multiple of the value sent by validators. 
+## 3.1 Subnet Architecture
 
-This simple starter template is split into three primary files. To write your own incentive mechanism, you should edit these files. These files are:
-- `template/protocol.py`: Contains the definition of the wire-protocol used by miners and validators.
-- `neurons/miner.py`: Script that defines the miner's behavior, i.e., how the miner responds to requests from validators.
-- `neurons/validator.py`: This script defines the validator's behavior, i.e., how the validator requests information from the miners and determines the scores.
+- **Nodes**: Nodes in the storage subnet will have roles similar to Filecoin, including miners (storage providers), validators and clients (storage consumers).
+    * **Miners**: Miners will serve their hard drive space to the network, storing encrypted data and proving its existence to validators. They commit to storing data for a specified duration. Miners earn TAO from network emissions for providing storage and serving client requests.
+    * **Validators**: Validators validate storage proofs from miners to ensure data integrity. They validate transactions and add them to the blockchain and earn TAO from network emissions for validating and maintaining network security.
+    * **Clients**: Clients will be able to store and retrieve data from the network. Optionally, they provide feedback or ratings on miner performance.
+- **Interaction Mechanisms**: Nodes will communicate using P2P networking and data transmission protocols.
+- **Consensus Mechanism**: The subnet will operate under Bittensor's Yuma consensus mechanism.
 
-### Example
+## 3.2 Storage Mechanism
 
-The Bittensor Subnet 1 for Text Prompting is built using this template. See [Bittensor Text-Prompting](https://github.com/opentensor/text-prompting) for how to configure the files and how to add monitoring and telemetry and support multiple miner types. Also see this Subnet 1 in action on [Taostats](https://taostats.io/subnets/netuid-1/) explorer.
+- **Data Storage**: Data will be distributed across nodes, ensuring redundancy and availability.
+- **Proof of Storage**: Miners will prove the existence of data to validators using a proof of storage mechanism.
+    * **Periodic Proofs**: Validators ask miners provide proof of storage periodically and miners submit cryptographic proofs of stored data to their assigned validators.
+    * **Validation**: Validators check these proofs. If valid, both miners and validators earn TAO from network emissions.
+- **Data Retrieval**: A mechanism will be designed for efficient data retrieval, leveraging Bittensor's peer-to-peer intelligence market.
 
----
+## 3.3 Incentive Mechanism
 
-## Installation
+Nodes will be rewarded based on their contribution to storage and the efficiency of data retrieval. The incentive function will limit rewards to peers that haven't reached consensus in the network.
 
-### Before you proceed
-Before you proceed with the installation of the subnet, note the following: 
+# 4. Implementation
 
-- Following these instructions you can run your subnet locally for your development and testing, or on Bittensor testnet. We do **recommend** that you first run your subnet locally and finish your development and testing before running the subnet on Bittensor testnet. 
-- You can also run your subnet either as a subnet owner, or as a validator or as a miner. 
-- **IMPORTANT:** Make sure you are aware of the minimum compute requirements for your subnet. See the [Minimum compute YAML configuration](./min_compute.yml).
-- Note that installation instructions differ based on your situation: For example, installing for local development and testing will require a few additional steps compared to installing for testnet. Similarly, installation instructions differ for a subnet owner vs a validator or a miner. 
+## 4.1 Subnet Registration Module
 
-### Install
+- **Hotkey Registration**: The subnet registration module is responsible for registering the subnet's hotkey on the Bittensor chain. This is done by calling the `recycle_register` function in the `bittensor s` package.
 
-- **Running locally**: Follow the step-by-step instructions described in this section: [Running Your Own Subtensor Chain Locally](./docs/running_on_staging.md).
-- **Running on Bittensor testnet**: Follow the step-by-step instructions described in this section: [Running on the Testing Network](./docs/running_on_testnet.md).
+- **Subnet Registration**: The subnet registration module is also responsible for registering the subnet on the Bittensor chain. This is done by calling the `create` function in the `bittensor s` package.
 
----
+## 4.2 Mining Module
+The miner (`neurons/miner.py`) is responsible for serving data to the network. It does this by partitioning a portion of the user's hard drive and filling it with data. The size of the partition is determined by the `threshold` parameter, which represents the proportion of available space that should be used to store data. The miner also periodically reallocates its database based on the available memory and the network state. The miner is also responsible for generating proofs of storage and submitting them to validators. The miner is rewarded for its contribution to the network by earning TAO from network emissions.
 
-## Writing your own incentive mechanism
+The miner uses SQLite databases to store and retrieve data. It maintains a separate database connection for each validator in the network. The `retrieve` and `store` functions are used to handle data retrieval and storage requests from validators. The miner also maintains a separate database connection for the partitioning algorithm. 
 
-As described in [Quickstarter template](#quickstarter-template) section above, when you are ready to write your own incentive mechanism, update this template repository by editing the following files. The code in these files contains detailed documentation on how to update the template. Read the documentation in each of the files to understand how to update the template. There are multiple **TODO**s in each of the files identifying sections you should update. These files are:
-- `template/protocol.py`: Contains the definition of the wire-protocol used by miners and validators.
-- `neurons/miner.py`: Script that defines the miner's behavior, i.e., how the miner responds to requests from validators.
-- `neurons/validator.py`: This script defines the validator's behavior, i.e., how the validator requests information from the miners and determines the scores.
+## 4.3 Validation Module
+The validator (`neurons/validator.py`) is responsible for verifying the integrity of the data served by the miner. It does this by comparing the hash of the retrieved data with a stored hash. 
+If the hashes do not match, it indicates that the data has been tampered with. The validator is rewarded for its contribution to the network by earning TAO from network emissions. 
 
----
+The validator also maintains a separate database connection for each miner in the network. The `retrieve` and `store` functions are used to handle data retrieval and storage requests from miners.
+The validator also maintains a separate database connection for the partitioning algorithm.
 
-## License
+## 4.4 Partitioning Algorithm
+The partitioning algorithm is responsible for partitioning the user's hard drive and filling it with data. It uses a greedy algorithm to partition the hard drive into chunks of size `CHUNK_SIZE`.
+
+The algorithm is run periodically to reallocate the database based on the available memory and the network state. The algorithm is also run at startup to initialize the database.
+
+## 4.5 Proof of Storage
+The proof of storage mechanism is responsible for proving the existence of data to validators. It does this by generating a cryptographic proof of the stored data and submitting it to the assigned validator.
+
+The validator then checks this proof.
+- If the proof is valid, it means that the miner is indeed storing the data, and both the miner and validator earn TAO from network emissions. 
+- If the proof is not valid, it means that the miner might not be storing the data it claims to be storing, and no rewards are given.
+
+The proof of storage mechanism is run periodically to generate proofs for all stored data.
+
+## 4.6 Data Storage
+The miner uses the `store` function to handle data storage requests from validators. When a validator sends a storage request, the miner stores the data in the appropriate SQLite database.
+
+The miner also generates a cryptographic proof of the stored data, known as a Proof of Storage. This proof is submitted to the validator to verify that the miner is indeed storing the data it claims to be storing.
+
+## 4.7 Data Retrieval
+Data retrieval is also handled by the miner node. When a client (or a validator) requests data, the miner uses the `retrieve` function to fetch the requested data from the SQLite database.
+
+The miner retrieves the data in chunks, based on the size of the chunks when they were stored. The data is then returned to the client or validator that requested it.
+
+It's important to note that the miner is rewarded for serving client requests, so it's incentivized to handle data retrieval requests efficiently and accurately.
+
+## 4.8 Incentive Mechanism
+Incentive mechanism is based on the contribution of nodes to the network. Both miners and validators earn TAO, the network's native token, from network emissions.
+
+- **Miners**: Miners earn TAO for providing storage and serving client requests. The amount of TAO earned is proportional to the amount of storage they provide and the number of client requests they serve. Miners also generate and submit proofs of storage to validators, and they earn TAO when these proofs are validated.
+
+- **Validators**: Validators earn TAO for validating storage proofs from miners and maintaining network security. When a validator validates a storage proof, both the miner who submitted the proof and the validator earn TAO.
+
+The reward mechanism is run periodically to distribute rewards to nodes for their contributions to the network. The exact frequency of these reward distributions is up to design, but it can be determined by the network's consensus protocol.
+
+It's important to note that if a miner's proof of storage is not valid, it indicates that the miner might not be storing the data it claims to be storing, and no rewards are given. This ensures that miners are incentivized to honestly and accurately report their storage contributions.
+
+
+# 5. Default Configuration
+- **CHUNK_SIZE**: Default value is `1<<20`. This represents the size of a chunk in bytes. The data is partitioned into chunks of this size for storage and retrieval.
+- **THRESHOLD**: Default value is `0.0001`. This represents the maximum amount of space the miner can use based on available space. It's used to determine the size of the partition for data storage.
+- **db_root_path**: Default value is `'~/bittensor-db'`. This is the path where the SQLite databases for data storage and retrieval are stored.
+- **netuid**: Default value is `1`. This is the netuid of the storage subnet that the miner and validator are serving on.
+- **wallet.name**: Default value is `'default'`. This is the name of the wallet used by the miner and validator.
+- **wallet.hotkey**: Default value is `'default'`. This is the hotkey of the wallet used by the miner and validator.
+
+Please note that these default values can be overridden by command-line arguments when running the miner or validator.
+
+
+# 6. Deployment
+
+You can find step-by-step guideline [here...](./docs/installation.md)
+
+
+# License
 This repository is licensed under the MIT License.
 ```text
-# The MIT License (MIT)
-# Copyright © 2023 Yuma Rao
+The MIT License (MIT)
+Copyright © 2023 Yuma Rao
 
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
-# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
-# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
-# the Software.
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+the Software.
 
-# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-# DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
 ```
