@@ -1,7 +1,6 @@
 # The MIT License (MIT)
 # Copyright © 2023 Yuma Rao
-# TODO(developer): Set your name
-# Copyright © 2023 <your name>
+# Copyright © 2023 salahawk <tylermcguy@gmail.com>
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
@@ -17,19 +16,26 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-# Bittensor Validator Template:
-# TODO(developer): Rewrite based on protocol defintion.
+# Storage Subnet Validator code:
 
 # Step 1: Import necessary libraries and modules
 import os
 import time
 import torch
+import random
 import argparse
 import traceback
 import bittensor as bt
 
+# Custom modules
+import copy
+import hashlib
+import sqlite3
+from tqdm import tqdm
+
 # import this repo
-import template
+import storage
+import allocate
 
 
 # Step 2: Set up the configuration parser
@@ -37,11 +43,12 @@ import template
 def get_config():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--alpha", default=0.9, type=float, help="The weight moving average scoring."
+        "--db_root_path",
+        default=os.path.expanduser("~/bittensor-db"),
+        help="Validator hashes",
     )
-    # TODO(developer): Adds your custom validator arguments to the parser.
     parser.add_argument(
-        "--custom", default="my_custom_value", help="Adds a custom value to the parser."
+        "--no_bridge", action="store_true", help="Run without bridging to the network."
     )
     # Adds override arguments for network and netuid.
     parser.add_argument("--netuid", type=int, default=1, help="The chain subnet uid.")
@@ -52,7 +59,6 @@ def get_config():
     # Adds wallet specific arguments i.e. --wallet.name ..., --wallet.hotkey ./. or --wallet.path ...
     bt.wallet.add_args(parser)
     # Parse the config (will take command-line arguments if provided)
-    # To print help message, run python3 template/validator.py --help
     config = bt.config(parser)
 
     # Step 3: Set up logging directory
@@ -99,7 +105,7 @@ def main(config):
     dendrite = bt.dendrite(wallet=wallet)
     bt.logging.info(f"Dendrite: {dendrite}")
 
-    # The metagraph holds the state of the network, letting us know about other validators and miners.
+    # The metagraph holds the state of the network, letting us know about other miners.
     metagraph = subtensor.metagraph(config.netuid)
     bt.logging.info(f"Metagraph: {metagraph}")
 
@@ -109,50 +115,159 @@ def main(config):
             f"\nYour validator: {wallet} if not registered to chain connection: {subtensor} \nRun btcli register and try again."
         )
         exit()
-
-    # Each validator gets a unique identity (UID) in the network for differentiation.
-    my_subnet_uid = metagraph.hotkeys.index(wallet.hotkey.ss58_address)
-    bt.logging.info(f"Running validator on uid: {my_subnet_uid}")
+    else:
+        # Each miner gets a unique identity (UID) in the network for differentiation.
+        my_subnet_uid = metagraph.hotkeys.index(wallet.hotkey.ss58_address)
+        bt.logging.info(f"Running validator on uid: {my_subnet_uid}")
 
     # Step 6: Set up initial scoring weights for validation
     bt.logging.info("Building validation weights.")
+    alpha = 0.9
     scores = torch.ones_like(metagraph.S, dtype=torch.float32)
     bt.logging.info(f"Weights: {scores}")
+
+    # Generate allocations for the validator.
+    next_allocations = []
+    verified_allocations = []
+    for hotkey in tqdm(metagraph.hotkeys):
+        db_path = os.path.expanduser(
+            f"{config.db_root_path}/{config.wallet.name}/{config.wallet.hotkey}/DB-{hotkey}-{wallet.hotkey.ss58_address}"
+        )
+        next_allocations.append(
+            {
+                "path": db_path,
+                "n_chunks": 100,
+                "seed": f"{hotkey}{wallet.hotkey.ss58_address}",
+                "miner": hotkey,
+                "validator": wallet.hotkey.ss58_address,
+                "hash": True,
+            }
+        )
+        verified_allocations.append(
+            {
+                "path": db_path,
+                "n_chunks": 0,
+                "seed": f"{hotkey}{wallet.hotkey.ss58_address}",
+                "miner": hotkey,
+                "validator": wallet.hotkey.ss58_address,
+                "hash": True,
+            }
+        )
+
+    # Generate the hash allocations.
+    allocate.generate(
+        allocations=next_allocations,  # The allocations to generate.
+        no_prompt=True,  # If True, no prompt will be shown
+        workers=10,  # The number of concurrent workers to use for generation. Default is 10.
+        restart=False,  # Dont restart the generation from empty files.
+    )
+
     # Step 7: The Main Validation Loop
     bt.logging.info("Starting validator loop.")
     step = 0
     while True:
         try:
-            # TODO(developer): Define how the validator selects a miner to query, how often, etc.
-            # Broadcast a query to all miners on the network.
-            responses = dendrite.query(
-                # Send the query to all miners in the network.
-                metagraph.axons,
-                # Construct a dummy query.
-                template.protocol.Dummy(dummy_input=step),  # Construct a dummy query.
-                # All responses have the deserialize function called on them before returning.
-                deserialize=True,
+            # Iterate over all miners on the network and validate them.
+            previous_allocations = copy.deepcopy(next_allocations)
+            for i, alloc in tqdm(enumerate(next_allocations)):
+                # Dont self validate.
+                if alloc["miner"] == wallet.hotkey.ss58_address:
+                    continue
+                print(f"Validating miner: {alloc}")
+
+                # Select a random chunk to validate.
+                chunk_i = str(random.randint(1, alloc["n_chunks"]))
+                bt.logging.debug(f"Validating chunk: {chunk_i}")
+
+                # Get the hash of the data to validate from the database.
+                db = sqlite3.connect(alloc["path"])
+                try:
+                    validation_hash = (
+                        db.cursor()
+                        .execute(
+                            f"SELECT hash FROM DB{alloc['seed']} WHERE id=?", (chunk_i,)
+                        )
+                        .fetchone()[0]
+                    )
+                except:
+                    bt.logging.error(
+                        f"Failed to get validation hash for chunk: {chunk_i} from db: {alloc['path']}"
+                    )
+                    continue
+                bt.logging.debug(f"Validation hash: {validation_hash}")
+                db.close()
+
+                # Query the miner for the data.
+                miner_data = dendrite.query(
+                    metagraph.axons[i],
+                    storage.protocol.Retrieve(key=chunk_i),
+                    deserialize=True,
+                )
+
+                if miner_data == None:
+                    # The miner could not respond with the data.
+                    # We reduce the estimated allocation for the miner.
+                    next_allocations[i]["n_chunks"] = max(
+                        int(next_allocations[i]["n_chunks"] * 0.9), 25
+                    )
+                    verified_allocations[i]["n_chunks"] = min(
+                        next_allocations[i]["n_chunks"],
+                        verified_allocations[i]["n_chunks"],
+                    )
+                    bt.logging.debug(
+                        f"Miner did not respond with data, reducing allocation to: {next_allocations[i]['n_chunks']}"
+                    )
+
+                elif miner_data != None:
+                    # The miner was able to respond with the data, but we need to verify it.
+                    computed_hash = hashlib.sha256(miner_data.encode()).hexdigest()
+                    bt.logging.debug(
+                        f"   Computed hash: {computed_hash}, Validation hash: {validation_hash} "
+                    )
+
+                    # Check if the miner has provided the correct response by doubling the dummy input.
+                    if computed_hash == validation_hash:
+                        # The miner has provided the correct response we can increase our known verified allocation.
+                        # We can also increase our estimated allocation for the miner.
+                        verified_allocations[i]["n_chunks"] = next_allocations[i][
+                            "n_chunks"
+                        ]
+                        next_allocations[i]["n_chunks"] = int(
+                            next_allocations[i]["n_chunks"] * 1.1
+                        )
+                        bt.logging.debug(
+                            f"Miner provided correct response, increasing allocation to: {next_allocations[i]['n_chunks']}"
+                        )
+                    else:
+                        # The miner has provided an incorrect response.
+                        # We need to decrease our estimation..
+                        next_allocations[i]["n_chunks"] = max(
+                            int(next_allocations[i]["n_chunks"] * 0.9), 25
+                        )
+                        verified_allocations[i]["n_chunks"] = min(
+                            next_allocations[i]["n_chunks"],
+                            verified_allocations[i]["n_chunks"],
+                        )
+                        bt.logging.debug(
+                            f"Miner provided incorrect response, reducing allocation to: {next_allocations[i]['n_chunks']}"
+                        )
+
+            # Reallocate the validator's chunks.
+            bt.logging.debug(
+                f"Prev allocations: {[ a['n_chunks'] for a in previous_allocations ]  }"
+            )
+            allocate.generate(
+                allocations=next_allocations,  # The allocations to generate.
+                no_prompt=True,  # If True, no prompt will be shown
+                restart=False,  # Dont restart the generation from empty files.
+            )
+            bt.logging.info(
+                f"Allocations: {[ allocate.human_readable_size( a['n_chunks'] * allocate.CHUNK_SIZE ) for a in next_allocations ] }"
             )
 
-            # Log the results for monitoring purposes.
-            bt.logging.info(f"Received dummy responses: {responses}")
-
-            # TODO(developer): Define how the validator scores responses.
-            # Adjust the scores based on responses from miners.
-            for i, resp_i in enumerate(responses):
-                # Check if the miner has provided the correct response by doubling the dummy input.
-                # If correct, set their score for this round to 1. Otherwise, set it to 0.
-                score = template.reward.dummy(step, resp_i)
-
-                # Update the global score of the miner.
-                # This score contributes to the miner's weight in the network.
-                # A higher weight means that the miner has been consistently responding correctly.
-                scores[i] = config.alpha * scores[i] + (1 - config.alpha) * score
-
-            bt.logging.info(f"Scores: {scores}")
             # Periodically update the weights on the Bittensor blockchain.
-            if (step + 1) % 10 == 0:
-                # TODO(developer): Define how the validator normalizes scores before setting weights.
+            if (step + 1) % 1000 == 0:
+                # TODO: Define how the validator normalizes scores before setting weights.
                 weights = torch.nn.functional.normalize(scores, p=1.0, dim=0)
                 bt.logging.info(f"Setting weights: {weights}")
                 # This is a crucial step that updates the incentive mechanism on the Bittensor blockchain.
@@ -173,8 +288,8 @@ def main(config):
             step += 1
             # Resync our local state with the latest state from the blockchain.
             metagraph = subtensor.metagraph(config.netuid)
-            # Sleep for a duration equivalent to the block time (i.e., time between successive blocks).
-            time.sleep(bt.__blocktime__)
+            # Wait a block step.
+            time.sleep(1)
 
         # If we encounter an unexpected error, log it for debugging.
         except RuntimeError as e:
