@@ -110,7 +110,7 @@ It's important to note that if a miner's proof of storage is not valid, it indic
 - **MIN_N_CHUNKS**: Default value is `1<<10`. This represents the minimum number of chunks a miner should provide at least. (1GB)
 - **THRESHOLD**: Default value is `0.0001`. This represents the maximum amount of space the miner can use based on available space. It's used to determine the size of the partition for data storage.
 - **db_root_path**: Default value is `'~/bittensor-db'`. This is the path where the SQLite databases for data storage and retrieval are stored.
-- **netuid**: Default value is `1`. This is the netuid of the storage subnet that the miner and validator are serving on.
+- **netuid**: Default value is `7`. This is the netuid of the storage subnet that the miner and validator are serving on.
 - **wallet.name**: Default value is `'default'`. This is the name of the wallet used by the miner and validator.
 - **wallet.hotkey**: Default value is `'default'`. This is the hotkey of the wallet used by the miner and validator.
 
