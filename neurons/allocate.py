@@ -242,7 +242,11 @@ def verify(data_allocations, hash_allocations):
                 break
 
             # Compute the hash of the fetched data.
-            computed_hash = hashlib.sha256(data_value[0].encode("utf-8")).hexdigest()
+            # computed_hash = hashlib.sha256(data_value[0].encode("utf-8")).hexdigest()
+            try:
+                computed_hash = hashlib.sha256(data_value[0].encode("utf-8")).hexdigest()
+            except:
+                computed_hash = hashlib.sha256(data_value[0]).hexdigest()
 
             # Check if the computed hash matches the stored hash.
             if computed_hash != stored_hash[0]:

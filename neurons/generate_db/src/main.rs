@@ -10,48 +10,57 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use clap::{App, Arg};
 use sha2::{Sha256, Digest};
 use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::distributions::Alphanumeric;
 
 struct ChunkGenerator {
     seed: [u8; 32],
     chunk_size: usize,
-    chunk: String
+    chunk: Vec<u8>
 }
 
 impl ChunkGenerator {
     pub fn new(seed: &str, chunk_size: usize) -> Self {
         ChunkGenerator {
-            seed: ChunkGenerator::hash_data(seed),
+            seed: Self::hash_data(seed.as_bytes()),
             chunk_size,
-            chunk: "0000000000000000000000000000000000000000000000000000000000000000".to_string()
+            chunk: vec![0u8; chunk_size]
         }
     }
 
-    fn generate_string_chunk(&self) -> String {
+    fn generate_string_chunk(&self) -> Vec<u8> {
         let prng = StdRng::from_seed(self.seed);
-        prng.sample_iter(rand::distributions::Alphanumeric)
+        prng.sample_iter(Alphanumeric)
             .take(self.chunk_size)
-            .map(char::from)
+            .map(|char| char as u8)
             .collect()
     }
 
-    fn hash_data(data: &str) -> [u8; 32] {
+    fn hash_data(data: &[u8]) -> [u8; 32] {
         let mut hasher = Sha256::new();
         hasher.update(data);
         hasher.finalize().into()
     }
 
-    fn xor_operation(base: &str, input: &str) -> String {
-        base.chars().zip(input.chars())
-            .map(|(a, b)| if a == b { '0' } else { '1' })
+    fn xor_operation(base: &[u8], input: &[u8]) -> Vec<u8> {
+        base.iter().zip(input.iter())
+            .map(|(&a, &b)| a ^ b)
             .collect()
     }
 
-    fn next(&mut self) -> (String, [u8; 32]) {
-        let base = self.generate_string_chunk();
-        let new_chunk: String = ChunkGenerator::xor_operation(&self.chunk.as_str(), &base.as_str());
-        let hash = ChunkGenerator::hash_data(&new_chunk);
+    pub fn next(&mut self) -> (Vec<u8>, [u8; 32]) {
+        // println!("Current Chunk (Hex): 0x{:?}", hex::encode(&self.chunk));
+        // println!("Current Seed (Hex): 0x{:?}", hex::encode(&self.seed));
 
-        self.seed = hash.clone();
+        let base = self.generate_string_chunk();
+        // println!("Base (Hex): 0x{:?}", hex::encode(&base));
+
+        let new_chunk = Self::xor_operation(&self.chunk, &base);
+        // println!("Next Chunk (Hex): 0x{:?}", hex::encode(&new_chunk));
+        
+        let hash = Self::hash_data(&new_chunk);
+        // println!("Next Seed (Hex): 0x{:?}", hex::encode(&hash));
+
+        self.seed = hash;
         self.chunk = new_chunk.clone();
         
         (new_chunk, hash)
@@ -136,7 +145,7 @@ fn main() {
     conn.execute(&create_table_sql, params![]).expect("Failed to create table");
     
     // Seed-based PRNG
-    let seed_array = ChunkGenerator::hash_data( matches.value_of("seed").unwrap() );
+    let seed_array = ChunkGenerator::hash_data( matches.value_of("seed").unwrap().as_bytes() );
 
     // Set up the progress bar.
     let multi = MultiProgress::new();
