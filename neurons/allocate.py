@@ -11,7 +11,7 @@ import bittensor as bt
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
-CHUNK_SIZE = 1 << 20
+CHUNK_SIZE = 1 << 20    # 1 MB
 
 
 def get_config() -> bt.config:
@@ -104,8 +104,8 @@ def human_readable_size(size: int) -> str:
     Returns:
         - str: Human-readable size.
     """
-    thresholds = [1 << 30, 1 << 20, 1 << 10]  # GB, MB, KB thresholds in bytes
-    units = ["GB", "MB", "KB", "bytes"]
+    thresholds = [1 << 40, 1 << 30, 1 << 20, 1 << 10]  # GB, MB, KB thresholds in bytes
+    units = ["TB", "GB", "MB", "KB", "bytes"]
 
     for threshold, unit in zip(thresholds, units):
         if size >= threshold:
@@ -316,7 +316,7 @@ def allocate(
         miner_key = wallet.hotkey.ss58_address
 
         # Get the validator key from the metagraph.
-        validator_key = metagraph.hotkeys[i]
+        validator_key = hotkey
 
         # Generate the seed for the current hotkey.
         seed = f"{miner_key}{validator_key}"

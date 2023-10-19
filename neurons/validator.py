@@ -37,6 +37,9 @@ from tqdm import tqdm
 import storage
 import allocate
 
+MIN_N_CHUNKS = 1 << 10  # the minimum number of chunks a miner should provide at least is 1GB (CHUNK_SIZE * MIN_N_CHUNKS)
+
+
 
 # Step 2: Set up the configuration parser
 # This function is responsible for setting up and parsing command-line arguments.
@@ -51,7 +54,7 @@ def get_config():
         "--no_bridge", action="store_true", help="Run without bridging to the network."
     )
     # Adds override arguments for network and netuid.
-    parser.add_argument("--netuid", type=int, default=1, help="The chain subnet uid.")
+    parser.add_argument("--netuid", type=int, default=7, help="The chain subnet uid.")
     # Adds subtensor specific arguments i.e. --subtensor.chain_endpoint ... --subtensor.network ...
     bt.subtensor.add_args(parser)
     # Adds logging specific arguments i.e. --logging.debug ..., --logging.trace .. or --logging.logging_dir ...
@@ -136,7 +139,7 @@ def main(config):
         next_allocations.append(
             {
                 "path": db_path,
-                "n_chunks": 100,
+                "n_chunks": MIN_N_CHUNKS,
                 "seed": f"{hotkey}{wallet.hotkey.ss58_address}",
                 "miner": hotkey,
                 "validator": wallet.hotkey.ss58_address,
@@ -208,7 +211,7 @@ def main(config):
                     # The miner could not respond with the data.
                     # We reduce the estimated allocation for the miner.
                     next_allocations[i]["n_chunks"] = max(
-                        int(next_allocations[i]["n_chunks"] * 0.9), 25
+                        int(next_allocations[i]["n_chunks"] * 0.9), MIN_N_CHUNKS
                     )
                     verified_allocations[i]["n_chunks"] = min(
                         next_allocations[i]["n_chunks"],
@@ -242,7 +245,7 @@ def main(config):
                         # The miner has provided an incorrect response.
                         # We need to decrease our estimation..
                         next_allocations[i]["n_chunks"] = max(
-                            int(next_allocations[i]["n_chunks"] * 0.9), 25
+                            int(next_allocations[i]["n_chunks"] * 0.9), MIN_N_CHUNKS
                         )
                         verified_allocations[i]["n_chunks"] = min(
                             next_allocations[i]["n_chunks"],
