@@ -2,29 +2,60 @@ extern crate rand;
 extern crate rand_chacha;
 extern crate indicatif;
 extern crate clap;
-extern crate lazy_static;
 extern crate rusqlite;
 extern crate log;
 
-use lazy_static::lazy_static;
 use rusqlite::{Connection, params};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use clap::{App, Arg};
 use sha2::{Sha256, Digest};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
-fn hash_data(data: &str) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    hasher.finalize().into()
+struct ChunkGenerator {
+    seed: [u8; 32],
+    chunk_size: usize,
+    chunk: String
 }
 
-fn combine_seeds(original_seed: [u8; 32], hash: [u8; 32]) -> [u8; 32] {
-    let mut combined = [0u8; 32];
-    for i in 0..32 {
-        combined[i] = original_seed[i] ^ hash[i];
+impl ChunkGenerator {
+    pub fn new(seed: &str, chunk_size: usize) -> Self {
+        ChunkGenerator {
+            seed: ChunkGenerator::hash_data(seed),
+            chunk_size,
+            chunk: "0000000000000000000000000000000000000000000000000000000000000000".to_string()
+        }
     }
-    combined
+
+    fn generate_string_chunk(&self) -> String {
+        let prng = StdRng::from_seed(self.seed);
+        prng.sample_iter(rand::distributions::Alphanumeric)
+            .take(self.chunk_size)
+            .map(char::from)
+            .collect()
+    }
+
+    fn hash_data(data: &str) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(data);
+        hasher.finalize().into()
+    }
+
+    fn xor_operation(base: &str, input: &str) -> String {
+        base.chars().zip(input.chars())
+            .map(|(a, b)| if a == b { '0' } else { '1' })
+            .collect()
+    }
+
+    fn next(&mut self) -> (String, [u8; 32]) {
+        let base = self.generate_string_chunk();
+        let new_chunk: String = ChunkGenerator::xor_operation(&self.chunk.as_str(), &base.as_str());
+        let hash = ChunkGenerator::hash_data(&new_chunk);
+
+        self.seed = hash.clone();
+        self.chunk = new_chunk.clone();
+        
+        (new_chunk, hash)
+    }
 }
 
 fn main() {
@@ -78,6 +109,9 @@ fn main() {
     let seed_value = matches.value_of("seed").unwrap();
     log::info!("seed_value: {}", seed_value);
 
+    // Initialize ChunkGenerator with the provided seed and chunk size
+    let mut chunk_gen = ChunkGenerator::new(seed_value, chunk_size);
+
     // Sanitize the seed value to ensure it's safe to use as a table name
     if !seed_value.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
         panic!("Invalid characters in seed value.");
@@ -102,7 +136,7 @@ fn main() {
     conn.execute(&create_table_sql, params![]).expect("Failed to create table");
     
     // Seed-based PRNG
-    let seed_array = hash_data( matches.value_of("seed").unwrap() );
+    let seed_array = ChunkGenerator::hash_data( matches.value_of("seed").unwrap() );
 
     // Set up the progress bar.
     let multi = MultiProgress::new();
@@ -150,18 +184,8 @@ fn main() {
         // Generate and store chunks
         pb.inc(start_index as u64);
         for i in start_index..num_chunks {
-            let mut prng = StdRng::from_seed(current_seed);
-            let chunk_data = generate_string_chunk(&mut prng, chunk_size);
-
-            // Build chained seed
-            let hash_of_data = hash_data(&chunk_data);
-            current_seed = combine_seeds(current_seed, hash_of_data);
-
-            // Hash the data for verification
-            let mut hasher = Sha256::new();
-            hasher.update(chunk_data.as_bytes());
-            let hash_bytes = hasher.finalize();
-            let hash_hex = hex::encode(&hash_bytes);
+            let (chunk_data, chunk_hash) = chunk_gen.next();
+            let hash_hex = hex::encode(&chunk_hash);
 
             // Store the id, data, hash, and rng_state
             let insert_sql = format!(
@@ -197,12 +221,4 @@ fn main() {
         _progress_thread_handle.join().unwrap();
     }
 
-}
-
-lazy_static! {
-    static ref CHARS: Vec<char> = ('a'..='z').chain('A'..'Z').chain('0'..'9').collect();
-}
-
-fn generate_string_chunk(prng: &mut StdRng, size: usize) -> String {
-    (0..size).map(|_| CHARS[prng.gen_range(0..CHARS.len())]).collect()
 }
