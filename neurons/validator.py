@@ -176,7 +176,7 @@ def main(config):
                 # Dont self validate.
                 if alloc["miner"] == wallet.hotkey.ss58_address:
                     continue
-                print(f"Validating miner: {alloc}")
+                bt.logging.debug(f"Validating miner [uid {i}]: {alloc}")
 
                 # Select a random chunk to validate.
                 chunk_i = str(random.randint(1, alloc["n_chunks"]))
@@ -218,14 +218,14 @@ def main(config):
                         verified_allocations[i]["n_chunks"],
                     )
                     bt.logging.debug(
-                        f"Miner did not respond with data, reducing allocation to: {next_allocations[i]['n_chunks']}"
+                        f"Miner [uid {i}] did not respond with data, reducing allocation to: {next_allocations[i]['n_chunks']}"
                     )
 
                 elif miner_data != None:
                     # The miner was able to respond with the data, but we need to verify it.
                     computed_hash = hashlib.sha256(miner_data.encode()).hexdigest()
                     bt.logging.debug(
-                        f"   Computed hash: {computed_hash}, Validation hash: {validation_hash} "
+                        f"Miner [uid {i}] Computed hash: {computed_hash}, Validation hash: {validation_hash} "
                     )
 
                     # Check if the miner has provided the correct response by doubling the dummy input.
@@ -239,7 +239,7 @@ def main(config):
                             next_allocations[i]["n_chunks"] * 1.1
                         )
                         bt.logging.debug(
-                            f"Miner provided correct response, increasing allocation to: {next_allocations[i]['n_chunks']}"
+                            f"Miner [uid {i}] provided correct response, increasing allocation to: {next_allocations[i]['n_chunks']}"
                         )
                     else:
                         # The miner has provided an incorrect response.
@@ -252,7 +252,7 @@ def main(config):
                             verified_allocations[i]["n_chunks"],
                         )
                         bt.logging.debug(
-                            f"Miner provided incorrect response, reducing allocation to: {next_allocations[i]['n_chunks']}"
+                            f"Miner [uid {i}] provided incorrect response, reducing allocation to: {next_allocations[i]['n_chunks']}"
                         )
 
             # Reallocate the validator's chunks.
