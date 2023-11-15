@@ -31,6 +31,7 @@ import torch
 import typing
 import allocate
 import sqlite3
+import hashlib
 from tqdm import tqdm
 
 # import this repo
@@ -97,6 +98,23 @@ def get_config():
         os.makedirs(config.full_path, exist_ok=True)
     return config
 
+def hash_data(data):
+    hasher = hashlib.sha256()
+    hasher.update(data)
+    return hasher.digest()
+
+#Find the available key of given table DB-miner_hotkey-validator_hotkey
+def find_available_key(db, miner_hotkey, validator_hotkey):
+    cursor = db.cursor()
+    
+    query = f"SELECT id FROM DB{miner_hotkey}{validator_hotkey} WHERE flag=?"
+    cursor.execute(query, ("F"))
+    data_value = cursor.fetchone()
+
+    if data_value:
+        return data_value[0]
+    else:
+        return -1
 
 # Main takes the config and starts the miner.
 def main(config):
@@ -182,44 +200,45 @@ def main(config):
 
     async def retrieve(synapse: storage.protocol.Retrieve) -> storage.protocol.Retrieve:
         # Check if we have the data connection locally
+        key = str(synapse.key)
+        if synapse.key_list:
+            key = str(synapse.key_list[wallet.hotkey.ss58_address])
+
         bt.logging.info(
-            f"Got RETRIEVE request for key: {synapse.key} from dendrite: {synapse.dendrite.hotkey}"
+            f"Got RETRIEVE request for key: {key} from dendrite: {synapse.dendrite.hotkey}"
         )  # Connect to SQLite databases
 
         db = get_db_connection(allocations[synapse.dendrite.hotkey])
         cursor = db.cursor()
 
         # Fetch data from SQLite databases
-        query = f"SELECT data FROM DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey} WHERE id=?"
-        cursor.execute(query, (synapse.key,))
+        query = f"SELECT data FROM DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey} WHERE id='{key}'"
+        cursor.execute(query)
         data_value = cursor.fetchone()
 
         # Set data to None if key not found
         if data_value:
             synapse.data = data_value[0]
-            bt.logging.success(f"Found data for key {synapse.key}!")
+            bt.logging.success(f"Found data for key {key}!")
         else:
             synapse.data = None
-            bt.logging.error(f"Data not found for key {synapse.key}!")
+            bt.logging.error(f"Data not found for key {key}!")
         return synapse
 
     async def store(synapse: storage.protocol.Store) -> storage.protocol.Store:
-        # Check if we have the data connection locally
-        bt.logging.info(
-            f"Got STORE request for key: {synapse.key} from dendrite: {synapse.dendrite.hotkey}"
-        )
         # Connect to SQLite databases
         db = get_db_connection(allocations[synapse.dendrite.hotkey])
         cursor = db.cursor()
-        bt.logging.info(
-            f"Got STORE request to store data: {synapse.data} under key: {synapse.key}"
-        )
 
         # Insert data into SQLite databases
         try:
-            update_request = f"UPDATE DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey} SET data = ? WHERE id = ?"
-            cursor.execute(update_request, (synapse.data, synapse.key))
+            update_request = f"UPDATE DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey} SET data = ?, hash = ?, flag = ? WHERE id = ?"
+            key = find_available_key(db, wallet.hotkey.ss58_address, synapse.dendrite.hotkey)
+            cursor.execute(update_request, (synapse.data, hash_data(synapse.data.encode('utf-8')), "T", key))
             db.commit()
+
+            synapse.key = key
+
         except Exception as e:
             bt.logging.error(f"Error updating database: {e}")
 
@@ -266,7 +285,7 @@ def main(config):
                     f"Incentive:{metagraph.I[my_subnet_uid]} | "
                     f"Emission:{metagraph.E[my_subnet_uid]}"
                 )
-                bt.logging.info(log)
+                #bt.logging.info(log)
 
             if step % config.steps_per_reallocate == 0:
                 metagraph = subtensor.metagraph(config.netuid)
