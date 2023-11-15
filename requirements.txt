@@ -1,4 +1,3 @@
 bittensor
-git+https://github.com/AYMENJD/rocksdb-python
 torch
 fastapi

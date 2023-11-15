@@ -1,3 +1,6 @@
+# This code investigates the size and schema of an SQLite database.
+# python inspect.py --db_path "/home/alex/Downloads/NeuroMorpho_OData_v7.7.1.sqlite"
+
 import os
 import sqlite3
 import argparse

@@ -37,9 +37,8 @@ from tqdm import tqdm
 import storage
 import allocate
 
+CHUNK_SIZE = 1 << 20    # 1 MB
 MIN_N_CHUNKS = 1 << 10  # the minimum number of chunks a miner should provide at least is 1GB (CHUNK_SIZE * MIN_N_CHUNKS)
-
-
 
 # Step 2: Set up the configuration parser
 # This function is responsible for setting up and parsing command-line arguments.
@@ -82,6 +81,19 @@ def get_config():
     # Return the parsed config.
     return config
 
+def split_file(metagraph, input_file, output_prefix, chunk_size):
+    axon_count = len(metagraph.axnos)
+    with open(input_file, 'rb') as infile:
+        chunk_number = 0
+        while True:
+            chunk = infile.read(chunk_size)
+            if not chunk:
+                break  # reached end of file
+            
+            chunk_store_count = random.randint(5, 10)
+            for i in range(chunk_store_count):
+                chunk_i = random.randint(0, axon_count)
+            chunk_number += 1
 
 def main(config):
     # Set up logging with the provided configuration and directory.
@@ -162,7 +174,7 @@ def main(config):
         allocations=next_allocations,  # The allocations to generate.
         no_prompt=True,  # If True, no prompt will be shown
         workers=10,  # The number of concurrent workers to use for generation. Default is 10.
-        restart=False,  # Dont restart the generation from empty files.
+        restart=True,  # Dont restart the generation from empty files.
     )
 
     # Step 7: The Main Validation Loop
@@ -173,13 +185,19 @@ def main(config):
             # Iterate over all miners on the network and validate them.
             previous_allocations = copy.deepcopy(next_allocations)
             for i, alloc in tqdm(enumerate(next_allocations)):
+                bt.logging.debug(f"Starting")
                 # Dont self validate.
                 if alloc["miner"] == wallet.hotkey.ss58_address:
                     continue
-                print(f"Validating miner: {alloc}")
+                bt.logging.debug(f"Validating miner [uid {i}]: {alloc}")
 
                 # Select a random chunk to validate.
-                chunk_i = str(random.randint(1, alloc["n_chunks"]))
+                verified_n_chunks = verified_allocations[i]["n_chunks"]
+                new_n_chunks = alloc["n_chunks"]
+                if verified_n_chunks >= new_n_chunks:
+                    chunk_i = str(random.randint(0, new_n_chunks))
+                else:
+                    chunk_i = str(random.randint(verified_n_chunks, new_n_chunks))
                 bt.logging.debug(f"Validating chunk: {chunk_i}")
 
                 # Get the hash of the data to validate from the database.
@@ -218,14 +236,14 @@ def main(config):
                         verified_allocations[i]["n_chunks"],
                     )
                     bt.logging.debug(
-                        f"Miner did not respond with data, reducing allocation to: {next_allocations[i]['n_chunks']}"
+                        f"Miner [uid {i}] did not respond with data, reducing allocation to: {next_allocations[i]['n_chunks']}"
                     )
 
-                elif miner_data != None:
+                else:
                     # The miner was able to respond with the data, but we need to verify it.
                     computed_hash = hashlib.sha256(miner_data.encode()).hexdigest()
                     bt.logging.debug(
-                        f"   Computed hash: {computed_hash}, Validation hash: {validation_hash} "
+                        f"Miner [uid {i}] Computed hash: {computed_hash}, Validation hash: {validation_hash} "
                     )
 
                     # Check if the miner has provided the correct response by doubling the dummy input.
@@ -239,7 +257,7 @@ def main(config):
                             next_allocations[i]["n_chunks"] * 1.1
                         )
                         bt.logging.debug(
-                            f"Miner provided correct response, increasing allocation to: {next_allocations[i]['n_chunks']}"
+                            f"Miner [uid {i}] provided correct response, increasing allocation to: {next_allocations[i]['n_chunks']}"
                         )
                     else:
                         # The miner has provided an incorrect response.
@@ -252,7 +270,7 @@ def main(config):
                             verified_allocations[i]["n_chunks"],
                         )
                         bt.logging.debug(
-                            f"Miner provided incorrect response, reducing allocation to: {next_allocations[i]['n_chunks']}"
+                            f"Miner [uid {i}] provided incorrect response, reducing allocation to: {next_allocations[i]['n_chunks']}"
                         )
 
             # Reallocate the validator's chunks.
@@ -292,7 +310,7 @@ def main(config):
             # Resync our local state with the latest state from the blockchain.
             metagraph = subtensor.metagraph(config.netuid)
             # Wait a block step.
-            time.sleep(1)
+            time.sleep(20)
 
         # If we encounter an unexpected error, log it for debugging.
         except RuntimeError as e:

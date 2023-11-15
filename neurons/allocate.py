@@ -30,7 +30,7 @@ def get_config() -> bt.config:
     parser.add_argument(
         "--threshold",
         type=float,
-        default=0.0001,
+        default=0.01,
         required=False,
         help="Size of path to fill",
     )
@@ -242,7 +242,11 @@ def verify(data_allocations, hash_allocations):
                 break
 
             # Compute the hash of the fetched data.
-            computed_hash = hashlib.sha256(data_value[0].encode("utf-8")).hexdigest()
+            # computed_hash = hashlib.sha256(data_value[0].encode("utf-8")).hexdigest()
+            try:
+                computed_hash = hashlib.sha256(data_value[0].encode("utf-8")).hexdigest()
+            except:
+                computed_hash = hashlib.sha256(data_value[0]).hexdigest()
 
             # Check if the computed hash matches the stored hash.
             if computed_hash != stored_hash[0]:
@@ -272,7 +276,7 @@ def allocate(
     db_root_path: str,  # Path to the data database.
     wallet: bt.wallet,  # Wallet object
     metagraph: bt.metagraph,  # Metagraph object
-    threshold: float = 0.0001,  # Threshold for the allocation.
+    threshold: float = 0.01,  # Threshold for the allocation.
     hash: bool = False,  # If True, the allocation is for a hash database. If False, the allocation is for a data database. Default is False.
 ) -> typing.List[dict]:
     """
@@ -282,7 +286,7 @@ def allocate(
         - db_path (str): The path to the data database.
         - wallet (bt.wallet): The wallet object containing the name and hotkey.
         - metagraph (bt.metagraph): The metagraph object containing the hotkeys.
-        - threshold (float): The threshold for the allocation. Default is 0.0001.
+        - threshold (float): The threshold for the allocation. Default is 0.01.
 
     Returns:
         - list: A list of dictionaries. Each dictionary contains the allocation details for a hotkey.

@@ -2,29 +2,115 @@ extern crate rand;
 extern crate rand_chacha;
 extern crate indicatif;
 extern crate clap;
-extern crate lazy_static;
 extern crate rusqlite;
 extern crate log;
 
-use lazy_static::lazy_static;
 use rusqlite::{Connection, params};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use clap::{App, Arg};
 use sha2::{Sha256, Digest};
 use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::distributions::Alphanumeric;
 
-fn hash_data(data: &str) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    hasher.finalize().into()
+struct ChunkGenerator {
+    seed: [u8; 32],
+    chunk_size: usize,
+    chunk: Vec<u8>
 }
 
-fn combine_seeds(original_seed: [u8; 32], hash: [u8; 32]) -> [u8; 32] {
-    let mut combined = [0u8; 32];
-    for i in 0..32 {
-        combined[i] = original_seed[i] ^ hash[i];
+impl ChunkGenerator {
+    pub fn new(seed: [u8; 32], chunk_size: usize, chunk: Vec<u8>) -> Self {
+        ChunkGenerator {
+            seed,
+            chunk_size,
+            chunk
+        }
     }
-    combined
+
+    fn generate_string_chunk(&self) -> Vec<u8> {
+        let prng = StdRng::from_seed(self.seed);
+        prng.sample_iter(Alphanumeric)
+            .take(self.chunk_size)
+            .map(|char| char as u8)
+            .collect()
+    }
+
+    fn hash_data(data: &[u8]) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(data);
+        hasher.finalize().into()
+    }
+
+    fn xor_operation(base: &[u8], input: &[u8]) -> Vec<u8> {
+        base.iter().zip(input.iter())
+            .map(|(&a, &b)| a ^ b)
+            .collect()
+    }
+
+    pub fn next(&mut self) -> (Vec<u8>, [u8; 32]) {
+        // println!("Current Chunk (Hex): 0x{:?}", hex::encode(&self.chunk));
+        // println!("Current Seed (Hex): 0x{:?}", hex::encode(&self.seed));
+
+        let base = self.generate_string_chunk();
+        // println!("Base (Hex): 0x{:?}", hex::encode(&base));
+
+        let new_chunk = Self::xor_operation(&self.chunk, &base);
+        // println!("Next Chunk (Hex): 0x{:?}", hex::encode(&new_chunk));
+        
+        let hash = Self::hash_data(&new_chunk);
+        // println!("Next Seed (Hex): 0x{:?}", hex::encode(&hash));
+
+        self.seed = hash;
+        self.chunk = new_chunk.clone();
+        
+        (new_chunk, hash)
+    }
+}
+
+fn retrieve_latest_rng_state(conn: &Connection, chunk: Vec<u8>) -> Vec<u8>{
+    let mut rng_state: Vec<u8> = chunk.clone();
+    // Create a table if it doesn't exist
+    let create_table_sql = format!(
+        "CREATE TABLE IF NOT EXISTS latest_rng_state (
+            id INTEGER PRIMARY KEY,
+            rng_state BLOB NOT NULL
+        )");
+    conn.execute(&create_table_sql, params![]).expect("Failed to create table");
+
+    // Retrieve the current latest rng_state from the database
+    let query_latest_rng_state = format!("SELECT rng_state FROM latest_rng_state WHERE id = ?");
+    let mut stmt = conn.prepare(&query_latest_rng_state).expect("Failed to prepare statement");
+
+    let mut rows = stmt.query(params![1]).expect("Failed to query database");
+
+    if let Some(row) = rows.next().expect("Failed to read row") {
+        let prev_rng_state: Vec<u8> = row.get(0).expect("Failed to get rng_state");
+        rng_state = prev_rng_state;
+    } else {
+        let insert_sql = format!(
+            "INSERT INTO latest_rng_state (id, rng_state) VALUES (?, ?)"
+        );
+
+        conn.execute(
+            &insert_sql, 
+            params![1, rng_state]
+        ).expect("Failed to insert into database");
+    }
+    rng_state
+}
+
+fn store_latest_rng_state(conn: &Connection, rng_state: Vec<u8>) {
+    
+    // Update the rng_state and store it back in the database
+    let update_sql = format!(
+        "UPDATE latest_rng_state SET rng_state = ? where id = 1"
+    );
+
+    conn.execute(
+        &update_sql, 
+        params![rng_state]
+    ).expect("Failed to update database");
+
 }
 
 fn main() {
@@ -76,19 +162,29 @@ fn main() {
     // Create a new SQLite connection
     let conn = Connection::open(path).expect("Failed to open database");
     let seed_value = matches.value_of("seed").unwrap();
-    log::info!("seed_value: {}", seed_value);
-
-    // Sanitize the seed value to ensure it's safe to use as a table name
-    if !seed_value.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-        panic!("Invalid characters in seed value.");
-    }
-
+    
     if matches.is_present("delete") {
-        let delete_table = format!(
+        let mut delete_table = format!(
             "DROP TABLE IF EXISTS DB{}", 
             seed_value
         );
         conn.execute(&delete_table, params![]).expect("Failed to drop table");
+        delete_table = format!(
+            "DROP TABLE IF EXISTS latest_rng_state"
+        );
+        conn.execute(&delete_table, params![]).expect("Failed to drop table");
+    }
+    let mut chunk = vec![0u8; chunk_size];
+    chunk = retrieve_latest_rng_state(&conn, chunk);
+    
+    let mut origin_seed = ChunkGenerator::hash_data(seed_value.as_bytes());
+    origin_seed = ChunkGenerator::hash_data(&chunk);
+    // Initialize ChunkGenerator with the provided seed and chunk size
+    let mut chunk_gen = ChunkGenerator::new(origin_seed, chunk_size, chunk);
+
+    // Sanitize the seed value to ensure it's safe to use as a table name
+    if !seed_value.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        panic!("Invalid characters in seed value.");
     }
     
     let create_table_sql = format!(
@@ -102,7 +198,7 @@ fn main() {
     conn.execute(&create_table_sql, params![]).expect("Failed to create table");
     
     // Seed-based PRNG
-    let seed_array = hash_data( matches.value_of("seed").unwrap() );
+    let seed_array = ChunkGenerator::hash_data( matches.value_of("seed").unwrap().as_bytes() );
 
     // Set up the progress bar.
     let multi = MultiProgress::new();
@@ -150,18 +246,8 @@ fn main() {
         // Generate and store chunks
         pb.inc(start_index as u64);
         for i in start_index..num_chunks {
-            let mut prng = StdRng::from_seed(current_seed);
-            let chunk_data = generate_string_chunk(&mut prng, chunk_size);
-
-            // Build chained seed
-            let hash_of_data = hash_data(&chunk_data);
-            current_seed = combine_seeds(current_seed, hash_of_data);
-
-            // Hash the data for verification
-            let mut hasher = Sha256::new();
-            hasher.update(chunk_data.as_bytes());
-            let hash_bytes = hasher.finalize();
-            let hash_hex = hex::encode(&hash_bytes);
+            let (chunk_data, chunk_hash) = chunk_gen.next();
+            let hash_hex = hex::encode(&chunk_hash);
 
             // Store the id, data, hash, and rng_state
             let insert_sql = format!(
@@ -196,13 +282,5 @@ fn main() {
         // Wait for the progress bars to finish
         _progress_thread_handle.join().unwrap();
     }
-
-}
-
-lazy_static! {
-    static ref CHARS: Vec<char> = ('a'..='z').chain('A'..'Z').chain('0'..'9').collect();
-}
-
-fn generate_string_chunk(prng: &mut StdRng, size: usize) -> String {
-    (0..size).map(|_| CHARS[prng.gen_range(0..CHARS.len())]).collect()
+    store_latest_rng_state(&conn, chunk_gen.chunk)
 }
