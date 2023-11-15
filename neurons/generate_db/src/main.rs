@@ -19,11 +19,11 @@ struct ChunkGenerator {
 }
 
 impl ChunkGenerator {
-    pub fn new(seed: &str, chunk_size: usize) -> Self {
+    pub fn new(seed: [u8; 32], chunk_size: usize, chunk: Vec<u8>) -> Self {
         ChunkGenerator {
-            seed: Self::hash_data(seed.as_bytes()),
+            seed,
             chunk_size,
-            chunk: vec![0u8; chunk_size]
+            chunk
         }
     }
 
@@ -65,6 +65,52 @@ impl ChunkGenerator {
         
         (new_chunk, hash)
     }
+}
+
+fn retrieve_latest_rng_state(conn: &Connection, chunk: Vec<u8>) -> Vec<u8>{
+    let mut rng_state: Vec<u8> = chunk.clone();
+    // Create a table if it doesn't exist
+    let create_table_sql = format!(
+        "CREATE TABLE IF NOT EXISTS latest_rng_state (
+            id INTEGER PRIMARY KEY,
+            rng_state BLOB NOT NULL
+        )");
+    conn.execute(&create_table_sql, params![]).expect("Failed to create table");
+
+    // Retrieve the current latest rng_state from the database
+    let query_latest_rng_state = format!("SELECT rng_state FROM latest_rng_state WHERE id = ?");
+    let mut stmt = conn.prepare(&query_latest_rng_state).expect("Failed to prepare statement");
+
+    let mut rows = stmt.query(params![1]).expect("Failed to query database");
+
+    if let Some(row) = rows.next().expect("Failed to read row") {
+        let prev_rng_state: Vec<u8> = row.get(0).expect("Failed to get rng_state");
+        rng_state = prev_rng_state;
+    } else {
+        let insert_sql = format!(
+            "INSERT INTO latest_rng_state (id, rng_state) VALUES (?, ?)"
+        );
+
+        conn.execute(
+            &insert_sql, 
+            params![1, rng_state]
+        ).expect("Failed to insert into database");
+    }
+    rng_state
+}
+
+fn store_latest_rng_state(conn: &Connection, rng_state: Vec<u8>) {
+    
+    // Update the rng_state and store it back in the database
+    let update_sql = format!(
+        "UPDATE latest_rng_state SET rng_state = ? where id = 1"
+    );
+
+    conn.execute(
+        &update_sql, 
+        params![rng_state]
+    ).expect("Failed to update database");
+
 }
 
 fn main() {
@@ -116,22 +162,29 @@ fn main() {
     // Create a new SQLite connection
     let conn = Connection::open(path).expect("Failed to open database");
     let seed_value = matches.value_of("seed").unwrap();
-    log::info!("seed_value: {}", seed_value);
-
-    // Initialize ChunkGenerator with the provided seed and chunk size
-    let mut chunk_gen = ChunkGenerator::new(seed_value, chunk_size);
-
-    // Sanitize the seed value to ensure it's safe to use as a table name
-    if !seed_value.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-        panic!("Invalid characters in seed value.");
-    }
-
+    
     if matches.is_present("delete") {
-        let delete_table = format!(
+        let mut delete_table = format!(
             "DROP TABLE IF EXISTS DB{}", 
             seed_value
         );
         conn.execute(&delete_table, params![]).expect("Failed to drop table");
+        delete_table = format!(
+            "DROP TABLE IF EXISTS latest_rng_state"
+        );
+        conn.execute(&delete_table, params![]).expect("Failed to drop table");
+    }
+    let mut chunk = vec![0u8; chunk_size];
+    chunk = retrieve_latest_rng_state(&conn, chunk);
+    
+    let mut origin_seed = ChunkGenerator::hash_data(seed_value.as_bytes());
+    origin_seed = ChunkGenerator::hash_data(&chunk);
+    // Initialize ChunkGenerator with the provided seed and chunk size
+    let mut chunk_gen = ChunkGenerator::new(origin_seed, chunk_size, chunk);
+
+    // Sanitize the seed value to ensure it's safe to use as a table name
+    if !seed_value.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        panic!("Invalid characters in seed value.");
     }
     
     let create_table_sql = format!(
@@ -229,5 +282,5 @@ fn main() {
         // Wait for the progress bars to finish
         _progress_thread_handle.join().unwrap();
     }
-
+    store_latest_rng_state(&conn, chunk_gen.chunk)
 }
