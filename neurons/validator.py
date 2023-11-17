@@ -37,7 +37,7 @@ from tqdm import tqdm
 import storage
 import allocate
 
-CHUNK_SIZE = 1 << 22    # 1 MB
+CHUNK_SIZE = 1 << 22    # 4 MB
 MIN_N_CHUNKS = 1 << 8  # the minimum number of chunks a miner should provide at least is 1GB (CHUNK_SIZE * MIN_N_CHUNKS)
 
 # Step 2: Set up the configuration parser

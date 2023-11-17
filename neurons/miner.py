@@ -253,6 +253,10 @@ def main(config):
         bt.logging.success(f"Stored data for key {synapse.key}!")
         return synapse
 
+    async def ping(synapse: storage.protocol.Ping) -> storage.protocol.Ping:
+        synapse.data = "OK"
+        return synapse
+
     # Step 5: Build and link miner functions to the axon.
     # The axon handles request processing, allowing validators to send this process requests.
     axon = bt.axon(wallet=wallet)
@@ -260,12 +264,12 @@ def main(config):
 
     # Attach determiners which functions are called when servicing a request.
     bt.logging.info(f"Attaching forward function to axon.")
-    axon.attach(retrieve).attach(store)
+    axon.attach(retrieve).attach(store).attach(ping)
 
     # Serve passes the axon information to the network + netuid we are hosting on.
     # This will auto-update if the axon port of external ip have changed.
     bt.logging.info(
-        f"Serving axon {store} and {retrieve} on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}"
+        f"Serving axon {store}, {retrieve} and {ping} on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}"
     )
     axon.serve(netuid=config.netuid, subtensor=subtensor)
 
