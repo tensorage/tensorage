@@ -33,9 +33,10 @@ class Store(bt.Synapse):
     def deserialize(self) -> int:
         return self.key
 
-class GetAllocation(bt.Synapse):
-    allocation: dict
-
+class Ping(bt.Synapse):
+    data: str = ""
+    def deserialize(self) -> str:
+        return self.data
 
 class Retrieve(bt.Synapse):
     # Key of data.

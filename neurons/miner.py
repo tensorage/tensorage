@@ -38,6 +38,7 @@ from tqdm import tqdm
 import storage
 import threading
 
+FAILED_KEY = -1
 
 def get_config():
     # Step 2: Set up the configuration parser
@@ -103,18 +104,21 @@ def hash_data(data):
     hasher.update(data)
     return hasher.digest()
 
-#Find the available key of given table DB-miner_hotkey-validator_hotkey
-def find_available_key(db, miner_hotkey, validator_hotkey):
-    cursor = db.cursor()
-    
-    query = f"SELECT id FROM DB{miner_hotkey}{validator_hotkey} WHERE flag=?"
-    cursor.execute(query, ("F"))
-    data_value = cursor.fetchone()
+#Find the available key among the items of given table
+def find_available_key(db, miner_hotkey, table_name):
+    try:
+        cursor = db.cursor()
+        
+        query = f"SELECT id FROM table_name WHERE flag=?"
+        cursor.execute(query, ("F"))
+        data_value = cursor.fetchone()
 
-    if data_value:
-        return data_value[0]
-    else:
-        return -1
+        if data_value:
+            return data_value[0]
+        else:
+            return FAILED_KEY
+    except Exception as e:
+        return FAILED_KEY
 
 # Main takes the config and starts the miner.
 def main(config):
@@ -143,6 +147,7 @@ def main(config):
     # metagraph provides the network's current state, holding state about other participants in a subnet.
     metagraph = subtensor.metagraph(config.netuid)
     bt.logging.info(f"Metagraph: {metagraph}")
+    bt.logging.info(f"Metagraph.S: {metagraph.S}")
 
     if wallet.hotkey.ss58_address not in metagraph.hotkeys:
         bt.logging.error(
@@ -165,9 +170,7 @@ def main(config):
             hash=False,
         )
     }
-    bt.logging.info(
-        f"Creating: {len(allocations)} with details: {json.dumps(allocations, indent=4, sort_keys=True)}"
-    )
+
     # Generate the data allocations.
     allocate.generate(
         allocations=list(allocations.values()),  # The allocations to generate.
@@ -190,7 +193,7 @@ def main(config):
     def get_db_connection(alloc):
         # Check if we have a connection for this thread
         if not hasattr(local_storage, f"connection_{alloc['validator']}"):
-            bt.logging.info(f"Connecting to database under path: {alloc['path']}")
+            #bt.logging.info(f"Connecting to database under path: {alloc['path']}")
             setattr(
                 local_storage,
                 f"connection_{alloc['validator']}",
@@ -200,9 +203,10 @@ def main(config):
 
     async def retrieve(synapse: storage.protocol.Retrieve) -> storage.protocol.Retrieve:
         # Check if we have the data connection locally
-        key = str(synapse.key)
         if synapse.key_list:
             key = str(synapse.key_list[wallet.hotkey.ss58_address])
+        else:
+            key = str(synapse.key)
 
         bt.logging.info(
             f"Got RETRIEVE request for key: {key} from dendrite: {synapse.dendrite.hotkey}"
@@ -223,6 +227,8 @@ def main(config):
         else:
             synapse.data = None
             bt.logging.error(f"Data not found for key {key}!")
+
+        db.close()
         return synapse
 
     async def store(synapse: storage.protocol.Store) -> storage.protocol.Store:
@@ -232,8 +238,8 @@ def main(config):
 
         # Insert data into SQLite databases
         try:
+            key = find_available_key(db, f"DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey}")
             update_request = f"UPDATE DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey} SET data = ?, hash = ?, flag = ? WHERE id = ?"
-            key = find_available_key(db, wallet.hotkey.ss58_address, synapse.dendrite.hotkey)
             cursor.execute(update_request, (synapse.data, hash_data(synapse.data.encode('utf-8')), "T", key))
             db.commit()
 
@@ -242,8 +248,13 @@ def main(config):
         except Exception as e:
             bt.logging.error(f"Error updating database: {e}")
 
+        db.close()
         # Return
         bt.logging.success(f"Stored data for key {synapse.key}!")
+        return synapse
+
+    async def ping(synapse: storage.protocol.Ping) -> storage.protocol.Ping:
+        synapse.data = "OK"
         return synapse
 
     # Step 5: Build and link miner functions to the axon.
@@ -253,12 +264,12 @@ def main(config):
 
     # Attach determiners which functions are called when servicing a request.
     bt.logging.info(f"Attaching forward function to axon.")
-    axon.attach(retrieve).attach(store)
+    axon.attach(retrieve).attach(store).attach(ping)
 
     # Serve passes the axon information to the network + netuid we are hosting on.
     # This will auto-update if the axon port of external ip have changed.
     bt.logging.info(
-        f"Serving axon {store} and {retrieve} on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}"
+        f"Serving axon {store}, {retrieve} and {ping} on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}"
     )
     axon.serve(netuid=config.netuid, subtensor=subtensor)
 
@@ -285,7 +296,7 @@ def main(config):
                     f"Incentive:{metagraph.I[my_subnet_uid]} | "
                     f"Emission:{metagraph.E[my_subnet_uid]}"
                 )
-                #bt.logging.info(log)
+                bt.logging.info(log)
 
             if step % config.steps_per_reallocate == 0:
                 metagraph = subtensor.metagraph(config.netuid)
@@ -300,7 +311,7 @@ def main(config):
                     )
                 }
                 bt.logging.info(
-                    f"Reallocating: {len(allocations)} with details: {json.dumps(allocations, indent=4, sort_keys=True)}"
+                    f"Reallocating .."
                 )
                 # Generate the data allocations.
                 allocate.generate(
