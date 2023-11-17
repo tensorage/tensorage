@@ -171,6 +171,7 @@ def main(config):
             # Iterate over all miners on the network and validate them.
             previous_allocations = copy.deepcopy(next_allocations)
             for i, alloc in tqdm(enumerate(next_allocations)):
+                bt.logging.debug(f"Starting")
                 # Dont self validate.
                 if alloc["miner"] == wallet.hotkey.ss58_address:
                     continue
