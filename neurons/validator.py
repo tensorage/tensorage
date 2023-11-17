@@ -265,7 +265,7 @@ def main(config):
             for index, uid in enumerate(metagraph.uids):
                 miner_hotkey = metagraph.neurons[uid].axon_info.hotkey
                 try:
-                    allocation_index = next(i for i, obj in enumerate(verified_allocations) if obj.hotkey == miner_hotkey)
+                    allocation_index = next(i for i, obj in enumerate(verified_allocations) if obj['miner'] == miner_hotkey)
                     score = verified_allocations[allocation_index]['n_chunks']
                 except StopIteration:
                     score = 0
