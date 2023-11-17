@@ -105,11 +105,11 @@ def hash_data(data):
     return hasher.digest()
 
 #Find the available key among the items of given table
-def find_available_key(db, miner_hotkey, table_name):
+def find_available_key(db, table_name):
     try:
         cursor = db.cursor()
         
-        query = f"SELECT id FROM table_name WHERE flag=?"
+        query = f"SELECT id FROM {table_name} WHERE flag=?"
         cursor.execute(query, ("F"))
         data_value = cursor.fetchone()
 
@@ -228,7 +228,6 @@ def main(config):
             synapse.data = None
             bt.logging.error(f"Data not found for key {key}!")
 
-        db.close()
         return synapse
 
     async def store(synapse: storage.protocol.Store) -> storage.protocol.Store:
@@ -248,7 +247,6 @@ def main(config):
         except Exception as e:
             bt.logging.error(f"Error updating database: {e}")
 
-        db.close()
         # Return
         bt.logging.success(f"Stored data for key {synapse.key}!")
         return synapse
