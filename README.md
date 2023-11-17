@@ -125,6 +125,7 @@ Minimum device requirement
 
 `'For miner'`
 - 1TB of Hard Disk, 4GB of RAM, 2 CPUs
+
 `'For validator'`
 - 80GB of Hard Disk, 4GB of RAM, 2 CPUs
 
