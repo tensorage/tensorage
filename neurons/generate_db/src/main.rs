@@ -110,7 +110,6 @@ fn store_latest_rng_state(conn: &Connection, rng_state: Vec<u8>) {
         &update_sql, 
         params![rng_state]
     ).expect("Failed to update database");
-
 }
 
 fn main() {
@@ -192,6 +191,7 @@ fn main() {
             id INTEGER PRIMARY KEY, 
             data TEXT NOT NULL, 
             hash TEXT NOT NULL,
+            flag TEXT NOT NULL,
             rng_state BLOB NOT NULL
         )", seed_value);
     log::info!("create_table_sql: {}", create_table_sql);
@@ -214,24 +214,28 @@ fn main() {
 
     // Get current state
     log::info!("Preparing statement to fetch the latest RNG state from the database.");
-    let query_latest_rng_state = format!("SELECT id, rng_state FROM DB{} ORDER BY id DESC LIMIT 1", seed_value);
-    let mut stmt = conn.prepare(&query_latest_rng_state).expect("Failed to prepare statement");
-
-    log::info!("Executing query to fetch the latest RNG state.");
-    let mut rows = stmt.query(params![]).expect("Failed to query database");
-
+    
     let mut start_index = 0;
     let mut current_seed = seed_array;  // default seed_array
+    
+    let query_latest_rng_state = format!("SELECT id, rng_state FROM DB{} ORDER BY id DESC LIMIT 1", seed_value);
+    {
+        let mut stmt = conn.prepare(&query_latest_rng_state).expect("Failed to prepare statement");
 
-    if let Some(row) = rows.next().expect("Failed to read row") {
-        start_index = row.get::<_, i64>(0).expect("Failed to get id") as usize + 1;  // +1 because we want to start from the next index
-        log::info!("Found latest id: {}", start_index - 1 );  // subtracting 1 to get the actual latest id
+        log::info!("Executing query to fetch the latest RNG state.");
+        let mut rows = stmt.query(params![]).expect("Failed to query database");
 
-        let seed_as_vec: Vec<u8> = row.get(1).expect("Failed to get rng_state");
-        current_seed.copy_from_slice(&seed_as_vec);
-        log::info!("Retrieved RNG state for id: {} seed: {:?}", start_index - 1 , current_seed);
-    } else {
-        log::warn!("No RNG state found in the database. Using default seed.");
+
+        if let Some(row) = rows.next().expect("Failed to read row") {
+            start_index = row.get::<_, i64>(0).expect("Failed to get id") as usize + 1;  // +1 because we want to start from the next index
+            log::info!("Found latest id: {}", start_index - 1 );  // subtracting 1 to get the actual latest id
+
+            let seed_as_vec: Vec<u8> = row.get(1).expect("Failed to get rng_state");
+            current_seed.copy_from_slice(&seed_as_vec);
+            log::info!("Retrieved RNG state for id: {} seed: {:?}", start_index - 1 , current_seed);
+        } else {
+            log::warn!("No RNG state found in the database. Using default seed.");
+        }
     }
 
     // Delete excess rows
@@ -251,7 +255,7 @@ fn main() {
 
             // Store the id, data, hash, and rng_state
             let insert_sql = format!(
-                "INSERT INTO DB{} (id, data, hash, rng_state) VALUES (?, ?, ?, ?)", 
+                "INSERT INTO DB{} (id, data, hash, flag, rng_state) VALUES (?, ?, ?, ?, ?)", 
                 seed_value
             );
 
@@ -262,13 +266,13 @@ fn main() {
                 // Store only the hash.
                 conn.execute(
                     &insert_sql, 
-                    params![i as i64, "", hash_hex, current_seed.to_vec()]
+                    params![i as i64, "", hash_hex, "F", current_seed.to_vec()]
                 ).expect("Failed to insert into database");
             } else {
                 // Store all the data.
                 conn.execute(
                     &insert_sql, 
-                    params![i as i64, chunk_data, hash_hex, current_seed.to_vec()]
+                    params![i as i64, chunk_data, hash_hex, "F", current_seed.to_vec()]
                 ).expect("Failed to insert into database");
             }
             pb.inc(1);
@@ -282,5 +286,6 @@ fn main() {
         // Wait for the progress bars to finish
         _progress_thread_handle.join().unwrap();
     }
-    store_latest_rng_state(&conn, chunk_gen.chunk)
+    store_latest_rng_state(&conn, chunk_gen.chunk);
+    conn.close();
 }

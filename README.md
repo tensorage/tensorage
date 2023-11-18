@@ -106,8 +106,8 @@ It's important to note that if a miner's proof of storage is not valid, it indic
 
 
 # 5. Default Configuration
-- **CHUNK_SIZE**: Default value is `1<<20`. This represents the size of a chunk in bytes. The data is partitioned into chunks of this size (1MB) for storage and retrieval.
-- **MIN_N_CHUNKS**: Default value is `1<<10`. This represents the minimum number of chunks a miner should provide at least. (1GB)
+- **CHUNK_SIZE**: Default value is `1<<22`. This represents the size of a chunk in bytes. The data is partitioned into chunks of this size (4MB) for storage and retrieval.
+- **MIN_N_CHUNKS**: Default value is `1<<8`. This represents the minimum number of chunks a miner should provide at least. (1GB)
 - **THRESHOLD**: Default value is `0.01`. This represents the maximum amount of space the miner can use based on available space. It's used to determine the size of the partition for data storage.
 - **db_root_path**: Default value is `'~/bittensor-db'`. This is the path where the SQLite databases for data storage and retrieval are stored.
 - **netuid**: Default value is `7`. This is the netuid of the storage subnet that the miner and validator are serving on.

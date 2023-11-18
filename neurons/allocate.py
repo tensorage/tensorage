@@ -11,8 +11,7 @@ import bittensor as bt
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
-CHUNK_SIZE = 1 << 20    # 1 MB
-
+CHUNK_SIZE = 1 << 22    # 4 MB
 
 def get_config() -> bt.config:
     parser = argparse.ArgumentParser(

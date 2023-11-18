@@ -37,9 +37,9 @@ from tqdm import tqdm
 import storage
 import allocate
 
-CHUNK_SIZE = 1 << 20    # 1 MB
-MIN_N_CHUNKS = 1 << 10  # the minimum number of chunks a miner should provide at least is 1GB (CHUNK_SIZE * MIN_N_CHUNKS)
-
+CHUNK_SIZE = 1 << 22    # 4 MB
+DEFAULT_N_CHUNKS = 1 << 8  # the minimum number of chunks a miner should provide at least is 1GB (CHUNK_SIZE * DEFAULT_N_CHUNKS)
+MIN_N_CHUNKS = 1
 # Step 2: Set up the configuration parser
 # This function is responsible for setting up and parsing command-line arguments.
 def get_config():
@@ -80,20 +80,6 @@ def get_config():
 
     # Return the parsed config.
     return config
-
-def split_file(metagraph, input_file, output_prefix, chunk_size):
-    axon_count = len(metagraph.axnos)
-    with open(input_file, 'rb') as infile:
-        chunk_number = 0
-        while True:
-            chunk = infile.read(chunk_size)
-            if not chunk:
-                break  # reached end of file
-            
-            chunk_store_count = random.randint(5, 10)
-            for i in range(chunk_store_count):
-                chunk_i = random.randint(0, axon_count)
-            chunk_number += 1
 
 def main(config):
     # Set up logging with the provided configuration and directory.
@@ -151,7 +137,7 @@ def main(config):
         next_allocations.append(
             {
                 "path": db_path,
-                "n_chunks": MIN_N_CHUNKS,
+                "n_chunks": DEFAULT_N_CHUNKS,
                 "seed": f"{hotkey}{wallet.hotkey.ss58_address}",
                 "miner": hotkey,
                 "validator": wallet.hotkey.ss58_address,
@@ -189,16 +175,16 @@ def main(config):
                 # Dont self validate.
                 if alloc["miner"] == wallet.hotkey.ss58_address:
                     continue
-                bt.logging.debug(f"Validating miner [uid {i}]: {alloc}")
+                bt.logging.debug(f"Validating miner [uid {i}]")
 
                 # Select a random chunk to validate.
                 verified_n_chunks = verified_allocations[i]["n_chunks"]
                 new_n_chunks = alloc["n_chunks"]
                 if verified_n_chunks >= new_n_chunks:
-                    chunk_i = str(random.randint(0, new_n_chunks))
+                    chunk_i = str(random.randint(0, new_n_chunks - 1))
                 else:
-                    chunk_i = str(random.randint(verified_n_chunks, new_n_chunks))
-                bt.logging.debug(f"Validating chunk: {chunk_i}")
+                    chunk_i = str(random.randint(verified_n_chunks, new_n_chunks - 1))
+                bt.logging.debug(f"Validating chunk_{chunk_i}")
 
                 # Get the hash of the data to validate from the database.
                 db = sqlite3.connect(alloc["path"])
@@ -212,10 +198,9 @@ def main(config):
                     )
                 except:
                     bt.logging.error(
-                        f"Failed to get validation hash for chunk: {chunk_i} from db: {alloc['path']}"
+                        f"❌ Failed to get validation hash for chunk_{chunk_i}"
                     )
                     continue
-                bt.logging.debug(f"Validation hash: {validation_hash}")
                 db.close()
 
                 # Query the miner for the data.
@@ -236,15 +221,12 @@ def main(config):
                         verified_allocations[i]["n_chunks"],
                     )
                     bt.logging.debug(
-                        f"Miner [uid {i}] did not respond with data, reducing allocation to: {next_allocations[i]['n_chunks']}"
+                        f"💤 Miner [uid {i}] did not respond with data, reducing allocation to: {next_allocations[i]['n_chunks']}"
                     )
 
                 else:
                     # The miner was able to respond with the data, but we need to verify it.
                     computed_hash = hashlib.sha256(miner_data.encode()).hexdigest()
-                    bt.logging.debug(
-                        f"Miner [uid {i}] Computed hash: {computed_hash}, Validation hash: {validation_hash} "
-                    )
 
                     # Check if the miner has provided the correct response by doubling the dummy input.
                     if computed_hash == validation_hash:
@@ -257,7 +239,7 @@ def main(config):
                             next_allocations[i]["n_chunks"] * 1.1
                         )
                         bt.logging.debug(
-                            f"Miner [uid {i}] provided correct response, increasing allocation to: {next_allocations[i]['n_chunks']}"
+                            f"✅ Miner [uid {i}] provided correct response, increasing allocation to: {next_allocations[i]['n_chunks']}"
                         )
                     else:
                         # The miner has provided an incorrect response.
@@ -270,20 +252,13 @@ def main(config):
                             verified_allocations[i]["n_chunks"],
                         )
                         bt.logging.debug(
-                            f"Miner [uid {i}] provided incorrect response, reducing allocation to: {next_allocations[i]['n_chunks']}"
+                            f"👎 Miner [uid {i}] provided incorrect response, reducing allocation to: {next_allocations[i]['n_chunks']}"
                         )
 
-            # Reallocate the validator's chunks.
-            bt.logging.debug(
-                f"Prev allocations: {[ a['n_chunks'] for a in previous_allocations ]  }"
-            )
             allocate.generate(
                 allocations=next_allocations,  # The allocations to generate.
                 no_prompt=True,  # If True, no prompt will be shown
                 restart=False,  # Dont restart the generation from empty files.
-            )
-            bt.logging.info(
-                f"Allocations: {[ allocate.human_readable_size( a['n_chunks'] * allocate.CHUNK_SIZE ) for a in next_allocations ] }"
             )
 
             # Periodically update the weights on the Bittensor blockchain.
@@ -301,9 +276,9 @@ def main(config):
                     wait_for_inclusion=True,
                 )
                 if result:
-                    bt.logging.success("Successfully set weights.")
+                    bt.logging.success("✅ Successfully set weights.")
                 else:
-                    bt.logging.error("Failed to set weights.")
+                    bt.logging.error("❌ Failed to set weights.")
 
             # End the current step and prepare for the next iteration.
             step += 1

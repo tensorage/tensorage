@@ -23,22 +23,25 @@ from bittensor.synapse import Synapse
 
 class Store(bt.Synapse):
     # Key of Data.
-    key: str
+    key: int = -1
     # String encoded data.
-    data: str
+    data: str = ""
 
     required_hash_fields: list[str] = ["key", "data"]
-
     
-    
+    # Deserialize responses.
+    def deserialize(self) -> int:
+        return self.key
 
-class GetAllocation(bt.Synapse):
-    allocation: dict
-
+class Ping(bt.Synapse):
+    data: str = ""
+    def deserialize(self) -> str:
+        return self.data
 
 class Retrieve(bt.Synapse):
     # Key of data.
-    key: str = None
+    key_list: dict = {}
+    key: str = ""
     # String encoded data.
     data: typing.Optional[str] = None
 
