@@ -39,7 +39,7 @@ import allocate
 
 CHUNK_SIZE = 1 << 22    # 4 MB
 DEFAULT_N_CHUNKS = 1 << 8  # the minimum number of chunks a miner should provide at least is 1GB (CHUNK_SIZE * DEFAULT_N_CHUNKS)
-MIN_N_CHUNKS = 1
+MIN_N_CHUNKS = 10
 # Step 2: Set up the configuration parser
 # This function is responsible for setting up and parsing command-line arguments.
 def get_config():
