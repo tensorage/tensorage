@@ -261,6 +261,16 @@ def main(config):
                 restart=False,  # Dont restart the generation from empty files.
             )
 
+            # Calculate score with n_chunks of verified_allocations
+            for index, uid in enumerate(metagraph.uids):
+                miner_hotkey = metagraph.neurons[uid].axon_info.hotkey
+                try:
+                    allocation_index = next(i for i, obj in enumerate(verified_allocations) if obj['miner'] == miner_hotkey)
+                    score = verified_allocations[allocation_index]['n_chunks']
+                except StopIteration:
+                    score = 0
+                scores[index] = alpha * scores[index] + (1 - alpha) * score
+
             # Periodically update the weights on the Bittensor blockchain.
             if (step + 1) % 1000 == 0:
                 # TODO: Define how the validator normalizes scores before setting weights.
