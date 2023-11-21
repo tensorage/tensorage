@@ -32,6 +32,21 @@ apt-get install libsqlite3-dev
 cargo build --release
 ```
 
+## Running subtensor locally
+
+### Install Docker
+```bash
+apt install docker.io -y
+apt install docker-compose -y
+```
+
+### Run Subtensor locally
+```bash
+git clone https://github.com/opentensor/subtensor.git
+cd subtensor
+docker-compose up --detach
+```
+
 ## Mining
 
 To run the miner
@@ -43,7 +58,7 @@ pm2 start neurons/miner.py --name miner --interpreter python3 --
     --logging.debug # Run in debug mode, alternatively --logging.trace for trace mode
     --threshold <OPTIONAL: threshold i.e. 0.01, default =  0.01>  # The threshold for the partitioning algorithm which is the maximum amount of space the miner can use based on available.
     --netuid <OPTIONAL: the subnet netuid, defualt = 7> # This is the netuid of the storage subnet.
-    --subtensor.network <OPTIONAL: the bittensor chain endpoint, default = finney, local, test> # The chain endpoint to use to generate the partition.
+    --subtensor.network local # <OPTIONAL: the bittensor chain endpoint, default = finney, local, test> : The chain endpoint to use to generate the partition.  (highly recommend running subtensor locally)
     --steps_per_reallocate <OPTIONAL: the number of steps before reallocating, default = 1000> # The number of steps before reallocating.
     # --restart <OPTIONAL: restart the partitioning process from the beginning, otherwise restarts from the last created chunk. default = False> # If true, the partitioning process restarts instead using a checkpoint.
 ```
@@ -58,6 +73,6 @@ pm2 start neurons/validator.py --name validator --interpreter python3 --
     --db_path <OPTIONAL: path where you want the DB files stored, default = "~/bittensor-db">  # This is where the partition will be created storing network data.
     --logging.debug # Run in debug mode, alternatively --logging.trace for trace mode
     --netuid <OPTIONAL: the subnet netuid, defualt = 7> # This is the netuid of the storage subnet you are serving on.
-    --subtensor.network <OPTIONAL: the bittensor chain endpoint, default = finney, local, test> # The chain endpoint to use to generate the partition.
+    --subtensor.network local # <OPTIONAL: the bittensor chain endpoint, default = finney, local, test> : The chain endpoint to use to generate the partition. (highly recommend running subtensor locally)
     --validator
 ```
