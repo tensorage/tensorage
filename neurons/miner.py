@@ -24,6 +24,7 @@ import time
 import argparse
 import traceback
 import bittensor as bt
+import threading
 
 # Custom modules
 import json
@@ -120,6 +121,15 @@ def find_available_key(db, table_name):
     except Exception as e:
         return FAILED_KEY
 
+#Generates data and hashes DBs
+def generate(allocations, no_prompt, workers, restart):
+    allocate.generate(
+        allocations=allocations,  # The allocations to generate.
+        no_prompt=no_prompt,  # If True, no prompt will be shown
+        workers=workers,  # The number of concurrent workers to use for generation. Default is 10.
+        restart=restart,  # If true, the miner will realocate its DB entirely (this is expensive and not recommended)
+    )
+
 # Main takes the config and starts the miner.
 def main(config):
     # Activating Bittensor's logging with the set configurations.
@@ -172,12 +182,14 @@ def main(config):
     }
 
     # Generate the data allocations.
-    allocate.generate(
-        allocations=list(allocations.values()),  # The allocations to generate.
-        no_prompt=True,  # If True, no prompt will be shown
-        workers=10,  # The number of concurrent workers to use for generation. Default is 10.
-        restart=config.restart,  # If true, the miner will realocate its DB entirely (this is expensive and not recommended)
-    )
+    # allocate.generate(
+    #     allocations=list(allocations.values()),  # The allocations to generate.
+    #     no_prompt=True,  # If True, no prompt will be shown
+    #     workers=10,  # The number of concurrent workers to use for generation. Default is 10.
+    #     restart=config.restart,  # If true, the miner will realocate its DB entirely (this is expensive and not recommended)
+    # )
+    thread_generation = threading.Thread(target=generate, args=(list(allocations.values()), True, 10, config.restart))
+    thread_generation.start()
 
     # Connect to SQLite databases.
     local_storage = threading.local()
@@ -202,41 +214,46 @@ def main(config):
         return getattr(local_storage, f"connection_{alloc['validator']}")
 
     async def retrieve(synapse: storage.protocol.Retrieve) -> storage.protocol.Retrieve:
-        # Check if we have the data connection locally
-        if synapse.key_list:
-            key = str(synapse.key_list[wallet.hotkey.ss58_address])
-        else:
-            key = str(synapse.key)
+        try:
+            # Check if we have the data connection locally
+            if synapse.key_list:
+                key = str(synapse.key_list[wallet.hotkey.ss58_address])
+            else:
+                key = str(synapse.key)
 
-        bt.logging.info(
-            f"Got RETRIEVE request for key: {key} from dendrite: {synapse.dendrite.hotkey}"
-        )  # Connect to SQLite databases
+            bt.logging.info(
+                f"Got RETRIEVE request for key: {key} from dendrite: {synapse.dendrite.hotkey}"
+            )  # Connect to SQLite databases
 
-        db = get_db_connection(allocations[synapse.dendrite.hotkey])
-        cursor = db.cursor()
+            db = get_db_connection(allocations[synapse.dendrite.hotkey])
+            cursor = db.cursor()
 
-        # Fetch data from SQLite databases
-        query = f"SELECT data FROM DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey} WHERE id='{key}'"
-        cursor.execute(query)
-        data_value = cursor.fetchone()
+            # Fetch data from SQLite databases
+            query = f"SELECT data FROM DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey} WHERE id='{key}'"
+            cursor.execute(query)
+            data_value = cursor.fetchone()
 
-        # Set data to None if key not found
-        if data_value:
-            synapse.data = data_value[0]
-            bt.logging.success(f"Found data for key {key}!")
-        else:
-            synapse.data = None
-            bt.logging.error(f"Data not found for key {key}!")
+            # Set data to None if key not found
+            if data_value:
+                synapse.data = data_value[0]
+                bt.logging.success(f"Found data for key {key}!")
+            else:
+                synapse.data = None
+                bt.logging.error(f"Data not found for key {key}!")
+        
+        except Exception as e:
+            bt.logging.error(f"Error retrieving data from db: {e}")
 
+        # Result
         return synapse
 
     async def store(synapse: storage.protocol.Store) -> storage.protocol.Store:
-        # Connect to SQLite databases
-        db = get_db_connection(allocations[synapse.dendrite.hotkey])
-        cursor = db.cursor()
-
-        # Insert data into SQLite databases
         try:
+            # Connect to SQLite databases
+            db = get_db_connection(allocations[synapse.dendrite.hotkey])
+            cursor = db.cursor()
+            
+            # Insert data into SQLite databases
             key = find_available_key(db, f"DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey}")
             update_request = f"UPDATE DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey} SET data = ?, hash = ?, flag = ? WHERE id = ?"
             cursor.execute(update_request, (synapse.data, hash_data(synapse.data.encode('utf-8')), "T", key))
@@ -245,7 +262,7 @@ def main(config):
             synapse.key = key
 
         except Exception as e:
-            bt.logging.error(f"Error updating database: {e}")
+            bt.logging.error(f"Error storing data to db: {e}")
 
         # Return
         bt.logging.success(f"Stored data for key {synapse.key}!")
@@ -296,7 +313,7 @@ def main(config):
                 )
                 bt.logging.info(log)
 
-            if step % config.steps_per_reallocate == 0:
+            if not thread_generation.is_alive() and step % config.steps_per_reallocate == 0:
                 metagraph = subtensor.metagraph(config.netuid)
                 allocations = {
                     a["validator"]: a
@@ -309,17 +326,20 @@ def main(config):
                     )
                 }
                 bt.logging.info(
-                    f"Reallocating .."
+                    f"Reallocating ..."
                 )
                 # Generate the data allocations.
-                allocate.generate(
-                    allocations=list(
-                        allocations.values()
-                    ),  # The allocations to generate.
-                    no_prompt=True,  # If True, no prompt will be shown
-                    workers=10,  # The number of concurrent workers to use for generation. Default is 10.
-                    restart=False,  # If true, the miner will realocate its DB entirely (this is expensive and not recommended)
-                )
+                # allocate.generate(
+                #     allocations=list(
+                #         allocations.values()
+                #     ),  # The allocations to generate.
+                #     no_prompt=True,  # If True, no prompt will be shown
+                #     workers=10,  # The number of concurrent workers to use for generation. Default is 10.
+                #     restart=False,  # If true, the miner will realocate its DB entirely (this is expensive and not recommended)
+                # )
+                            
+                thread_generation = threading.Thread(target=generate, args=(list(allocations.values()), True, 10, False))
+                thread_generation.start()
 
             step += 1
             time.sleep(1)
