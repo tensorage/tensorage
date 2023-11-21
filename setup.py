@@ -67,7 +67,7 @@ setup(
     description="storage-subnet on bittensor",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/salahawk/storage-subnet",
+    url="https://github.com/tensorage/tensorage",
     author="salahawk",
     packages=find_packages(),
     include_package_data=True,
