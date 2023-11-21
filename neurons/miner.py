@@ -24,6 +24,7 @@ import time
 import argparse
 import traceback
 import bittensor as bt
+import threading
 
 # Custom modules
 import json
@@ -120,6 +121,15 @@ def find_available_key(db, table_name):
     except Exception as e:
         return FAILED_KEY
 
+#Generates data and hashes DBs
+def generate(allocations, no_prompt, workers, restart):
+    allocate.generate(
+        allocations=allocations,  # The allocations to generate.
+        no_prompt=no_prompt,  # If True, no prompt will be shown
+        workers=workers,  # The number of concurrent workers to use for generation. Default is 10.
+        restart=restart,  # If true, the miner will realocate its DB entirely (this is expensive and not recommended)
+    )
+
 # Main takes the config and starts the miner.
 def main(config):
     # Activating Bittensor's logging with the set configurations.
@@ -172,12 +182,14 @@ def main(config):
     }
 
     # Generate the data allocations.
-    allocate.generate(
-        allocations=list(allocations.values()),  # The allocations to generate.
-        no_prompt=True,  # If True, no prompt will be shown
-        workers=10,  # The number of concurrent workers to use for generation. Default is 10.
-        restart=config.restart,  # If true, the miner will realocate its DB entirely (this is expensive and not recommended)
-    )
+    # allocate.generate(
+    #     allocations=list(allocations.values()),  # The allocations to generate.
+    #     no_prompt=True,  # If True, no prompt will be shown
+    #     workers=10,  # The number of concurrent workers to use for generation. Default is 10.
+    #     restart=config.restart,  # If true, the miner will realocate its DB entirely (this is expensive and not recommended)
+    # )
+    thread_generation = threading.Thread(target=generate, args=(list(allocations.values()), True, 10, config.restart))
+    thread_generation.start()
 
     # Connect to SQLite databases.
     local_storage = threading.local()
@@ -296,7 +308,7 @@ def main(config):
                 )
                 bt.logging.info(log)
 
-            if step % config.steps_per_reallocate == 0:
+            if not thread_generation.is_alive() and step % config.steps_per_reallocate == 0:
                 metagraph = subtensor.metagraph(config.netuid)
                 allocations = {
                     a["validator"]: a
@@ -309,17 +321,20 @@ def main(config):
                     )
                 }
                 bt.logging.info(
-                    f"Reallocating .."
+                    f"Reallocating ..."
                 )
                 # Generate the data allocations.
-                allocate.generate(
-                    allocations=list(
-                        allocations.values()
-                    ),  # The allocations to generate.
-                    no_prompt=True,  # If True, no prompt will be shown
-                    workers=10,  # The number of concurrent workers to use for generation. Default is 10.
-                    restart=False,  # If true, the miner will realocate its DB entirely (this is expensive and not recommended)
-                )
+                # allocate.generate(
+                #     allocations=list(
+                #         allocations.values()
+                #     ),  # The allocations to generate.
+                #     no_prompt=True,  # If True, no prompt will be shown
+                #     workers=10,  # The number of concurrent workers to use for generation. Default is 10.
+                #     restart=False,  # If true, the miner will realocate its DB entirely (this is expensive and not recommended)
+                # )
+                            
+                thread_generation = threading.Thread(target=generate, args=(list(allocations.values()), True, 10, False))
+                thread_generation.start()
 
             step += 1
             time.sleep(1)
