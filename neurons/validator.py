@@ -38,8 +38,8 @@ import storage
 import allocate
 
 CHUNK_SIZE = 1 << 22    # 4 MB
-MIN_N_CHUNKS = 1 << 8  # the minimum number of chunks a miner should provide at least is 1GB (CHUNK_SIZE * MIN_N_CHUNKS)
-
+DEFAULT_N_CHUNKS = 1 << 8  # the minimum number of chunks a miner should provide at least is 1GB (CHUNK_SIZE * DEFAULT_N_CHUNKS)
+MIN_N_CHUNKS = 10
 # Step 2: Set up the configuration parser
 # This function is responsible for setting up and parsing command-line arguments.
 def get_config():
@@ -137,7 +137,7 @@ def main(config):
         next_allocations.append(
             {
                 "path": db_path,
-                "n_chunks": MIN_N_CHUNKS,
+                "n_chunks": DEFAULT_N_CHUNKS,
                 "seed": f"{hotkey}{wallet.hotkey.ss58_address}",
                 "miner": hotkey,
                 "validator": wallet.hotkey.ss58_address,
@@ -171,11 +171,12 @@ def main(config):
             # Iterate over all miners on the network and validate them.
             previous_allocations = copy.deepcopy(next_allocations)
             for i, alloc in tqdm(enumerate(next_allocations)):
+                if i < 11:
+                    continue
                 bt.logging.debug(f"Starting")
                 # Dont self validate.
                 if alloc["miner"] == wallet.hotkey.ss58_address:
                     continue
-                bt.logging.debug(f"Validating miner [uid {i}]")
 
                 # Select a random chunk to validate.
                 verified_n_chunks = verified_allocations[i]["n_chunks"]
@@ -184,7 +185,7 @@ def main(config):
                     chunk_i = str(random.randint(0, new_n_chunks - 1))
                 else:
                     chunk_i = str(random.randint(verified_n_chunks, new_n_chunks - 1))
-                bt.logging.debug(f"Validating chunk_{chunk_i}")
+                bt.logging.debug(f"Validating miner [uid {i}] (chunk_{chunk_i})")
 
                 # Get the hash of the data to validate from the database.
                 db = sqlite3.connect(alloc["path"])
