@@ -6,8 +6,8 @@ This is a prototype incentive mechanism for storage where miners serve their har
 
 ### Install `pm2`
 ```bash
-apt update && apt upgrade
-apt install nodejs npm
+apt update && apt upgrade -y
+apt install nodejs npm -y
 npm i -g pm2
 ```
 
@@ -16,27 +16,18 @@ npm i -g pm2
 git clone https://github.com/tensorage/tensorage
 ```
 
-### Create a virtual environment for the repository
-```bash
-python -m venv venv
-```
-This will create a virtual environment for the repository (`venv` directory will be created under the root of the repository)
-
-### Activate the virtual environment
-```bash
-sudo source ./venv/bin/activate
-```
-
 ### Install package dependencies for the repository
 ```bash
-python -m pip install -e .
+cd tensorage
+apt install python3-pip -y
+python3 -m pip install -e .
 ```
 
 ### Build rust binary
 ```bash
 cd neurons/generate_db
-apt install rustc
-apt install cargo
+apt install rustc -y
+apt install cargo -y
 apt-get install libsqlite3-dev
 cargo build --release
 ```
@@ -45,13 +36,13 @@ cargo build --release
 
 To run the miner
 ```bash
-pm2 start neurons/miner.py --name miner --interpreter python -- 
+pm2 start neurons/miner.py --name miner --interpreter python3 -- 
     --wallet.name <OPTIONAL: your miner wallet, default = default> # Must be created using the bittensor-cli, btcli wallet new_coldkey
     --wallet.hotkey <OPTIONAL: your validator hotkey, defautl = default> # Must be created using the bittensor-cli btcli wallet new_hotkey
     --db_path <OPTIONAL: path where you want the DB files stored, default = "~/bittensor-db">  # This is where the partition will be created storing network data.
     --logging.debug # Run in debug mode, alternatively --logging.trace for trace mode
     --threshold <OPTIONAL: threshold i.e. 0.01, default =  0.01>  # The threshold for the partitioning algorithm which is the maximum amount of space the miner can use based on available.
-    --netuid <OPTIONAL: the subnet netuid, defualt = 1> # This is the netuid of the storage subnet you are serving on.
+    --netuid <OPTIONAL: the subnet netuid, defualt = 7> # This is the netuid of the storage subnet.
     --subtensor.network <OPTIONAL: the bittensor chain endpoint, default = finney, local, test> # The chain endpoint to use to generate the partition.
     --steps_per_reallocate <OPTIONAL: the number of steps before reallocating, default = 1000> # The number of steps before reallocating.
     # --restart <OPTIONAL: restart the partitioning process from the beginning, otherwise restarts from the last created chunk. default = False> # If true, the partitioning process restarts instead using a checkpoint.
@@ -61,11 +52,12 @@ pm2 start neurons/miner.py --name miner --interpreter python --
 
 To run the validator
 ```bash
-pm2 start neurons/validator.py --name validator --interpreter python -- 
+pm2 start neurons/validator.py --name validator --interpreter python3 -- 
     --wallet.name <OPTIONAL: your miner wallet, default = default> # Must be created using the bittensor-cli, btcli wallet new_coldkey
     --wallet.hotkey <OPTIONAL: your validator hotkey, default = default> # Must be created using the bittensor-cli btcli wallet new_hotkey
     --db_path <OPTIONAL: path where you want the DB files stored, default = "~/bittensor-db">  # This is where the partition will be created storing network data.
     --logging.debug # Run in debug mode, alternatively --logging.trace for trace mode
-    --netuid <OPTIONAL: the subnet netuid, defualt = 1> # This is the netuid of the storage subnet you are serving on.
+    --netuid <OPTIONAL: the subnet netuid, defualt = 7> # This is the netuid of the storage subnet you are serving on.
     --subtensor.network <OPTIONAL: the bittensor chain endpoint, default = finney, local, test> # The chain endpoint to use to generate the partition.
+    --validator
 ```
