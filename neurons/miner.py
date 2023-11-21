@@ -214,41 +214,46 @@ def main(config):
         return getattr(local_storage, f"connection_{alloc['validator']}")
 
     async def retrieve(synapse: storage.protocol.Retrieve) -> storage.protocol.Retrieve:
-        # Check if we have the data connection locally
-        if synapse.key_list:
-            key = str(synapse.key_list[wallet.hotkey.ss58_address])
-        else:
-            key = str(synapse.key)
+        try:
+            # Check if we have the data connection locally
+            if synapse.key_list:
+                key = str(synapse.key_list[wallet.hotkey.ss58_address])
+            else:
+                key = str(synapse.key)
 
-        bt.logging.info(
-            f"Got RETRIEVE request for key: {key} from dendrite: {synapse.dendrite.hotkey}"
-        )  # Connect to SQLite databases
+            bt.logging.info(
+                f"Got RETRIEVE request for key: {key} from dendrite: {synapse.dendrite.hotkey}"
+            )  # Connect to SQLite databases
 
-        db = get_db_connection(allocations[synapse.dendrite.hotkey])
-        cursor = db.cursor()
+            db = get_db_connection(allocations[synapse.dendrite.hotkey])
+            cursor = db.cursor()
 
-        # Fetch data from SQLite databases
-        query = f"SELECT data FROM DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey} WHERE id='{key}'"
-        cursor.execute(query)
-        data_value = cursor.fetchone()
+            # Fetch data from SQLite databases
+            query = f"SELECT data FROM DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey} WHERE id='{key}'"
+            cursor.execute(query)
+            data_value = cursor.fetchone()
 
-        # Set data to None if key not found
-        if data_value:
-            synapse.data = data_value[0]
-            bt.logging.success(f"Found data for key {key}!")
-        else:
-            synapse.data = None
-            bt.logging.error(f"Data not found for key {key}!")
+            # Set data to None if key not found
+            if data_value:
+                synapse.data = data_value[0]
+                bt.logging.success(f"Found data for key {key}!")
+            else:
+                synapse.data = None
+                bt.logging.error(f"Data not found for key {key}!")
+        
+        except Exception as e:
+            bt.logging.error(f"Error retrieving data from db: {e}")
 
+        # Result
         return synapse
 
     async def store(synapse: storage.protocol.Store) -> storage.protocol.Store:
-        # Connect to SQLite databases
-        db = get_db_connection(allocations[synapse.dendrite.hotkey])
-        cursor = db.cursor()
-
-        # Insert data into SQLite databases
         try:
+            # Connect to SQLite databases
+            db = get_db_connection(allocations[synapse.dendrite.hotkey])
+            cursor = db.cursor()
+            
+            # Insert data into SQLite databases
             key = find_available_key(db, f"DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey}")
             update_request = f"UPDATE DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey} SET data = ?, hash = ?, flag = ? WHERE id = ?"
             cursor.execute(update_request, (synapse.data, hash_data(synapse.data.encode('utf-8')), "T", key))
@@ -257,7 +262,7 @@ def main(config):
             synapse.key = key
 
         except Exception as e:
-            bt.logging.error(f"Error updating database: {e}")
+            bt.logging.error(f"Error storing data to db: {e}")
 
         # Return
         bt.logging.success(f"Stored data for key {synapse.key}!")

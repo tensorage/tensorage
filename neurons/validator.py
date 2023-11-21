@@ -177,7 +177,6 @@ def main(config):
                 # Dont self validate.
                 if alloc["miner"] == wallet.hotkey.ss58_address:
                     continue
-                bt.logging.debug(f"Validating miner [uid {i}]")
 
                 # Select a random chunk to validate.
                 verified_n_chunks = verified_allocations[i]["n_chunks"]
@@ -186,7 +185,7 @@ def main(config):
                     chunk_i = str(random.randint(0, new_n_chunks - 1))
                 else:
                     chunk_i = str(random.randint(verified_n_chunks, new_n_chunks - 1))
-                bt.logging.debug(f"Validating chunk_{chunk_i}")
+                bt.logging.debug(f"Validating miner [uid {i}] (chunk_{chunk_i})")
 
                 # Get the hash of the data to validate from the database.
                 db = sqlite3.connect(alloc["path"])
@@ -229,8 +228,6 @@ def main(config):
                 else:
                     # The miner was able to respond with the data, but we need to verify it.
                     computed_hash = hashlib.sha256(miner_data.encode()).hexdigest()
-
-                    bt.logging.info(f"V: {validation_hash}, C: {computed_hash}")
 
                     # Check if the miner has provided the correct response by doubling the dummy input.
                     if computed_hash == validation_hash:
