@@ -171,6 +171,8 @@ def main(config):
             # Iterate over all miners on the network and validate them.
             previous_allocations = copy.deepcopy(next_allocations)
             for i, alloc in tqdm(enumerate(next_allocations)):
+                if i < 11:
+                    continue
                 bt.logging.debug(f"Starting")
                 # Dont self validate.
                 if alloc["miner"] == wallet.hotkey.ss58_address:
@@ -227,6 +229,8 @@ def main(config):
                 else:
                     # The miner was able to respond with the data, but we need to verify it.
                     computed_hash = hashlib.sha256(miner_data.encode()).hexdigest()
+
+                    bt.logging.info(f"V: {validation_hash}, C: {computed_hash}")
 
                     # Check if the miner has provided the correct response by doubling the dummy input.
                     if computed_hash == validation_hash:
