@@ -192,14 +192,14 @@ def generate(
         if not confirm_generation(allocations):
             exit()
 
-    # Delete all databases if restart flag is true
-    if restart and allocations:
-        db_root_path = os.path.dirname(allocations[0]['path'])
-        try:
-            shutil.rmtree(db_root_path)
-            bt.logging.info(f"Folder '{db_root_path}' and its contents successfully deleted.")
-        except OSError as e:
-            bt.logging.error(f"Error: {e}")
+    # # Delete all databases if restart flag is true
+    # if restart and allocations:
+    #     db_root_path = os.path.dirname(allocations[0]['path'])
+    #     try:
+    #         shutil.rmtree(db_root_path)
+    #         bt.logging.info(f"Folder '{db_root_path}' and its contents successfully deleted.")
+    #     except OSError as e:
+    #         bt.logging.error(f"Error: {e}")
 
     # Finally, we run the generation process. This is done using a ThreadPoolExecutor, which allows us to run multiple tasks concurrently.
     # For each allocation, we submit two tasks to the executor: one for generating the hash, and one for generating the data.
