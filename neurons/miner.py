@@ -41,6 +41,7 @@ import threading
 
 FAILED_KEY = -1
 
+
 def get_config():
     # Step 2: Set up the configuration parser
     # This function initializes the necessary command-line arguments.
@@ -100,18 +101,20 @@ def get_config():
         os.makedirs(config.full_path, exist_ok=True)
     return config
 
+
 def hash_data(data):
     hasher = hashlib.sha256()
     hasher.update(data)
     return hasher.digest()
 
-#Find the available key among the items of given table
+
+# Find the available key among the items of given table
 def find_available_key(db, table_name):
     try:
         cursor = db.cursor()
         
         query = f"SELECT id FROM {table_name} WHERE flag=?"
-        cursor.execute(query, ("F"))
+        cursor.execute(query, "F")
         data_value = cursor.fetchone()
 
         if data_value:
@@ -121,7 +124,8 @@ def find_available_key(db, table_name):
     except Exception as e:
         return FAILED_KEY
 
-#Generates data and hashes DBs
+
+# Generates data and hashes DBs
 def generate(allocations, no_prompt, workers, restart):
     allocate.generate(
         allocations=allocations,  # The allocations to generate.
@@ -130,14 +134,13 @@ def generate(allocations, no_prompt, workers, restart):
         restart=restart,  # If true, the miner will realocate its DB entirely (this is expensive and not recommended)
     )
 
+
 # Main takes the config and starts the miner.
 def main(config):
     # Activating Bittensor's logging with the set configurations.
     config.db_root_path = os.path.expanduser(config.db_root_path)
     bt.logging(config=config, logging_dir=config.full_path)
-    bt.logging.info(
-        f"Running miner for subnet: {config.netuid} on network: {config.subtensor.chain_endpoint} with config:"
-    )
+    bt.logging.info(f"Running miner for subnet: {config.netuid} on network: {config.subtensor.chain_endpoint} with config:")
 
     # This logs the active configuration to the specified logging directory for review.
     bt.logging.info(config)
@@ -160,9 +163,7 @@ def main(config):
     bt.logging.info(f"Metagraph.S: {metagraph.S}")
 
     if wallet.hotkey.ss58_address not in metagraph.hotkeys:
-        bt.logging.error(
-            f"\nYour miner: {wallet} is not registered to chain connection: {subtensor} \nRun btcli s register and try again. "
-        )
+        bt.logging.error(f"\nYour miner: {wallet} is not registered to chain connection: {subtensor} \nRun btcli s register and try again.")
         exit()
     else:
         # Each miner gets a unique identity (UID) in the network for differentiation.
@@ -182,12 +183,6 @@ def main(config):
     }
 
     # Generate the data allocations.
-    # allocate.generate(
-    #     allocations=list(allocations.values()),  # The allocations to generate.
-    #     no_prompt=True,  # If True, no prompt will be shown
-    #     workers=10,  # The number of concurrent workers to use for generation. Default is 10.
-    #     restart=config.restart,  # If true, the miner will realocate its DB entirely (this is expensive and not recommended)
-    # )
     thread_generation = threading.Thread(target=generate, args=(list(allocations.values()), True, 10, config.restart))
     thread_generation.start()
 
@@ -205,7 +200,7 @@ def main(config):
     def get_db_connection(alloc):
         # Check if we have a connection for this thread
         if not hasattr(local_storage, f"connection_{alloc['validator']}"):
-            #bt.logging.info(f"Connecting to database under path: {alloc['path']}")
+            bt.logging.info(f"Connecting to database under path: {alloc['path']}")
             setattr(
                 local_storage,
                 f"connection_{alloc['validator']}",
@@ -221,10 +216,9 @@ def main(config):
             else:
                 key = str(synapse.key)
 
-            bt.logging.info(
-                f"Got RETRIEVE request for key: {key} from dendrite: {synapse.dendrite.hotkey}"
-            )  # Connect to SQLite databases
+            bt.logging.info(f"Got RETRIEVE request for key: {key} from dendrite: {synapse.dendrite.hotkey}")
 
+            # Connect to SQLite databases
             db = get_db_connection(allocations[synapse.dendrite.hotkey])
             cursor = db.cursor()
 
@@ -274,7 +268,7 @@ def main(config):
 
     # Step 5: Build and link miner functions to the axon.
     # The axon handles request processing, allowing validators to send this process requests.
-    axon = bt.axon(wallet=wallet)
+    axon = bt.axon(config=config, wallet=wallet)
     bt.logging.info(f"Axon {axon}")
 
     # Attach determiners which functions are called when servicing a request.
@@ -283,9 +277,7 @@ def main(config):
 
     # Serve passes the axon information to the network + netuid we are hosting on.
     # This will auto-update if the axon port of external ip have changed.
-    bt.logging.info(
-        f"Serving axon {store}, {retrieve} and {ping} on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}"
-    )
+    bt.logging.info(f"Serving axon {store}, {retrieve} and {ping} on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}")
     axon.serve(netuid=config.netuid, subtensor=subtensor)
 
     # Start  starts the miner's axon, making it active on the network.
@@ -299,10 +291,10 @@ def main(config):
     while True:
         try:
             # Below: Periodically update our knowledge of the network graph.
-            if step % 5 == 0:
+            if step % 300 == 0:
                 metagraph = subtensor.metagraph(config.netuid)
                 log = (
-                    f"Step:{step} | "
+                    f"Step:{int(step / 300)} | "
                     f"Block:{metagraph.block.item()} | "
                     f"Stake:{metagraph.S[my_subnet_uid]} | "
                     f"Rank:{metagraph.R[my_subnet_uid]} | "
@@ -322,22 +314,10 @@ def main(config):
                         wallet=wallet,
                         metagraph=metagraph,
                         threshold=config.threshold,
-                        hash=False,
+                        hash=False
                     )
                 }
-                bt.logging.info(
-                    f"Reallocating ..."
-                )
-                # Generate the data allocations.
-                # allocate.generate(
-                #     allocations=list(
-                #         allocations.values()
-                #     ),  # The allocations to generate.
-                #     no_prompt=True,  # If True, no prompt will be shown
-                #     workers=10,  # The number of concurrent workers to use for generation. Default is 10.
-                #     restart=False,  # If true, the miner will realocate its DB entirely (this is expensive and not recommended)
-                # )
-                            
+                bt.logging.info(f"Reallocating ...")
                 thread_generation = threading.Thread(target=generate, args=(list(allocations.values()), True, 10, False))
                 thread_generation.start()
 
@@ -350,6 +330,7 @@ def main(config):
             close_db_connections()  # Close all db connections
             bt.logging.success("Miner killed by keyboard interrupt.")
             break
+
         # In case of unforeseen errors, the miner will log the error and continue operations.
         except Exception as e:
             bt.logging.error(traceback.format_exc())
