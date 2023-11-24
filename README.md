@@ -127,7 +127,7 @@ Minimum device requirement
 - 1 TB of Hard Disk (It can be less depends on your needs), 4 GB of RAM, 4 CPUs
 
 `'For validator'`
-- 500 GB of Hard Disk, 16 GB of RAM, 12 CPUs
+- 500 GB of Hard Disk, 8 GB of RAM, 8 CPUs
 
 # License
 This repository is licensed under the MIT License.
