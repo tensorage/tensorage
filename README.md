@@ -51,9 +51,9 @@ Nodes will be rewarded based on their contribution to storage and the efficiency
 
 ## 4.1 Subnet Registration Module
 
-- **Hotkey Registration**: The subnet registration module is responsible for registering the subnet's hotkey on the Bittensor chain. This is done by calling the `recycle_register` function in the `bittensor s` package.
+- **Hotkey Registration**: The subnet registration module is responsible for registering the subnet's hotkey on the Bittensor chain. This is done by using the `btcli s register` command in the `bittensor` package.
 
-- **Subnet Registration**: The subnet registration module is also responsible for registering the subnet on the Bittensor chain. This is done by calling the `create` function in the `bittensor s` package.
+- **Subnet Registration**: The subnet registration module is also responsible for registering the subnet on the Bittensor chain. This is done by using the `btcli s create` command in the `bittensor` package.
 
 ## 4.2 Mining Module
 The miner (`neurons/miner.py`) is responsible for serving data to the network. It does this by partitioning a portion of the user's hard drive and filling it with data. The size of the partition is determined by the `threshold` parameter, which represents the proportion of available space that should be used to store data. The miner also periodically reallocates its database based on the available memory and the network state. The miner is also responsible for generating proofs of storage and submitting them to validators. The miner is rewarded for its contribution to the network by earning TAO from network emissions.
@@ -107,7 +107,7 @@ It's important to note that if a miner's proof of storage is not valid, it indic
 
 # 5. Default Configuration
 - **CHUNK_SIZE**: Default value is `1<<22`. This represents the size of a chunk in bytes. The data is partitioned into chunks of this size (4MB) for storage and retrieval.
-- **MIN_N_CHUNKS**: Default value is `1<<8`. This represents the minimum number of chunks a miner should provide at least. (1GB)
+- **DEFAULT_N_CHUNKS**: Default value is `1<<8`. This represents the minimum number of chunks a miner should provide at least. (1GB)
 - **THRESHOLD**: Default value is `0.01`. This represents the maximum amount of space the miner can use based on available space. It's used to determine the size of the partition for data storage.
 - **db_root_path**: Default value is `'~/bittensor-db'`. This is the path where the SQLite databases for data storage and retrieval are stored.
 - **netuid**: Default value is `7`. This is the netuid of the storage subnet that the miner and validator are serving on.
@@ -124,7 +124,7 @@ You can find step-by-step guideline [here...](./docs/installation.md)
 Minimum device requirement
 
 `'For miner'`
-- 1 TB of Hard Disk (depends on your needs), 8 GB of RAM, 8 CPUs
+- 1 TB of Hard Disk (It can be less depends on your needs), 4 GB of RAM, 4 CPUs
 
 `'For validator'`
 - 500 GB of Hard Disk, 16 GB of RAM, 12 CPUs

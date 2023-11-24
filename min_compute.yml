@@ -7,14 +7,11 @@ compute_spec:
     architecture: x86_64  # Architecture type (e.g., x86_64, arm64)
 
   gpu:
-    required: true  # Does the application require a GPU?
-    min_vram: 8GB  # Minimum GPU VRAM
-    cuda_cores: 1024  # Minimum number of CUDA cores (if applicable)
-    min_compute_capability: 6.0  # Minimum CUDA compute capability
-
+    required: false  # Does the application require a GPU?
+    
   memory:
-    min_ram: 16GB  # Minimum RAM
-    min_swap: 4GB  # Minimum swap space
+    min_ram: 4GB  # Minimum RAM
+    min_swap: 1GB  # Minimum swap space
 
   storage:
     min_space: 100GB  # Minimum free storage space
