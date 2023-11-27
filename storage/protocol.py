@@ -27,7 +27,7 @@ class Store(bt.Synapse):
     # String encoded data.
     data: str = ""
 
-    required_hash_fields: list[str] = ["key", "data"]
+    required_hash_fields: typing.List[str] = ["key", "data"]
     
     # Deserialize responses.
     def deserialize(self) -> int:
@@ -45,7 +45,7 @@ class Retrieve(bt.Synapse):
     # String encoded data.
     data: typing.Optional[str] = None
 
-    required_hash_fields: list[str] = ["key", "data"]
+    required_hash_fields: typing.List[str] = ["key", "data"]
     
     # Deserialize responses.
     def deserialize(self) -> str:
