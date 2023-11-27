@@ -54,7 +54,7 @@ To run the miner
 pm2 start neurons/miner.py --name miner --interpreter python3 -- 
     --wallet.name <OPTIONAL: your miner wallet, default = default> # Must be created using the bittensor-cli, btcli wallet new_coldkey
     --wallet.hotkey <OPTIONAL: your validator hotkey, defautl = default> # Must be created using the bittensor-cli btcli wallet new_hotkey
-    --db_path <OPTIONAL: path where you want the DB files stored, default = "~/bittensor-db">  # This is where the partition will be created storing network data.
+    --db_root_path <OPTIONAL: path where you want the DB files stored, default = "~/bittensor-db">  # This is where the partition will be created storing network data.
     --logging.debug # Run in debug mode, alternatively --logging.trace for trace mode
     --threshold <OPTIONAL: threshold i.e. 0.01, default =  0.01>  # The threshold for the partitioning algorithm which is the maximum amount of space the miner can use based on available.
     --netuid <OPTIONAL: the subnet netuid, defualt = 7> # This is the netuid of the storage subnet.
@@ -70,7 +70,7 @@ To run the validator
 pm2 start neurons/validator.py --name validator --interpreter python3 -- 
     --wallet.name <OPTIONAL: your miner wallet, default = default> # Must be created using the bittensor-cli, btcli wallet new_coldkey
     --wallet.hotkey <OPTIONAL: your validator hotkey, default = default> # Must be created using the bittensor-cli btcli wallet new_hotkey
-    --db_path <OPTIONAL: path where you want the DB files stored, default = "~/bittensor-db">  # This is where the partition will be created storing network data.
+    --db_root_path <OPTIONAL: path where you want the DB files stored, default = "~/bittensor-db">  # This is where the partition will be created storing network data.
     --logging.debug # Run in debug mode, alternatively --logging.trace for trace mode
     --netuid <OPTIONAL: the subnet netuid, defualt = 7> # This is the netuid of the storage subnet you are serving on.
     --subtensor.network local # <OPTIONAL: the bittensor chain endpoint, default = finney, local, test> : The chain endpoint to use to generate the partition. (highly recommend running subtensor locally)
