@@ -64,7 +64,7 @@ def get_config():
     parser.add_argument(
         "--threshold",
         type=float,
-        default=0.001,
+        default=0.9,
         required=False,
         help="Size of path to fill",
     )
