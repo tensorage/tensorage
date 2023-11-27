@@ -56,7 +56,7 @@ pm2 start neurons/miner.py --name miner --interpreter python3 --
     --wallet.hotkey <OPTIONAL: your validator hotkey, defautl = default> # Must be created using the bittensor-cli btcli wallet new_hotkey
     --db_root_path <OPTIONAL: path where you want the DB files stored, default = "~/bittensor-db">  # This is where the partition will be created storing network data.
     --logging.debug # Run in debug mode, alternatively --logging.trace for trace mode
-    --threshold <OPTIONAL: threshold i.e. 0.01, default =  0.01>  # The threshold for the partitioning algorithm which is the maximum amount of space the miner can use based on available.
+    --threshold <OPTIONAL: threshold i.e. 0.9, default =  0.9>  # The threshold for the partitioning algorithm which is the maximum amount of space the miner can use based on available.
     --netuid <OPTIONAL: the subnet netuid, defualt = 7> # This is the netuid of the storage subnet.
     --subtensor.network local # <OPTIONAL: the bittensor chain endpoint, default = finney, local, test> : The chain endpoint to use to generate the partition.  (highly recommend running subtensor locally)
     --steps_per_reallocate <OPTIONAL: the number of steps before reallocating, default = 1000> # The number of steps before reallocating.
