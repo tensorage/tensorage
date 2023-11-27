@@ -180,7 +180,7 @@ def main(config):
                 verified_n_chunks = verified_allocations[i]["n_chunks"]
                 new_n_chunks = alloc["n_chunks"]
                 if verified_n_chunks >= new_n_chunks:
-                    chunk_i = str(random.randint(0, new_n_chunks - 1))
+                    chunk_i = str(random.randint(int(new_n_chunks * 0.8), new_n_chunks - 1))
                 else:
                     chunk_i = str(random.randint(verified_n_chunks, new_n_chunks - 1))
                 bt.logging.debug(f"Validating miner [uid {i}] (chunk_{chunk_i})")
