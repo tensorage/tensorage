@@ -291,10 +291,10 @@ def main(config):
     while True:
         try:
             # Below: Periodically update our knowledge of the network graph.
-            if step % 300 == 0:
+            if step % 5 == 0:
                 metagraph = subtensor.metagraph(config.netuid)
                 log = (
-                    f"Step:{int(step / 300)} | "
+                    f"Step:{step} | "
                     f"Block:{metagraph.block.item()} | "
                     f"Stake:{metagraph.S[my_subnet_uid]} | "
                     f"Rank:{metagraph.R[my_subnet_uid]} | "
