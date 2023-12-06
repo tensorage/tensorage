@@ -195,6 +195,9 @@ def main(config):
     bt.logging.info("Starting validator loop.")
     step = 0
     while True:
+        # Measure the time it takes to validate all the miners running on the subnet.
+        start_time = time.time()
+
         try:
             # Iterate over all miners on the network and validate them.
             for i, alloc in tqdm(enumerate(next_allocations)):
@@ -340,8 +343,14 @@ def main(config):
             else:
                 bt.logging.error("❌ Failed to set weights.")
 
+
             # End the current step and prepare for the next iteration.
             step += 1
+            # Log the time it took to validate all miners.
+            bt.logging.info(
+                f"Finished validation step {step} in {time.time() - start_time} seconds."
+            )
+
             # Resync our local state with the latest state from the blockchain.
             metagraph = subtensor.metagraph(config.netuid)
             # Wait a block step.
