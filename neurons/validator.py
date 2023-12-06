@@ -136,15 +136,16 @@ def main(config):
     bt.logging.info("Building validation weights.")
     alpha = 0.9
     scores = torch.ones_like(metagraph.S, dtype=torch.float32)
-    bt.logging.info(f"Weights: {scores}")
 
     # Load previously stored verified_allocations
     old_verified_allocations = []
     if os.path.exists(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl")):
+        bt.logging.info("Previous weights found.")
         with open(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl"), 'rb') as f:
             old_verified_allocations = pickle.load(f)
-    
-    print(old_verified_allocations)
+        bt.logging.success("✅ Successfully restored previously-saved weights.")
+    else:
+        bt.logging.info("Previous weights state not found.")
 
     # Generate allocations for the validator.
     next_allocations = []
