@@ -30,9 +30,10 @@ import pickle
 import bittensor as bt
 
 # Custom modules
-import copy
 import hashlib
 import sqlite3
+from rich.console import Console
+from rich.table import Table
 from tqdm import tqdm
 
 # import this repo
@@ -90,6 +91,25 @@ def get_config():
 
     # Return the parsed config.
     return config
+
+
+def log_table(data, title: str="Score"):
+    """
+    Purpose: show a table to console
+    """
+    table = Table(title=title)
+    table.add_column("UID", justify="right", style="cyan", no_wrap=True)
+    table.add_column("Score", justify="right", style="cyan", no_wrap=True)
+
+    for i, d in enumerate(data):
+        table.add_row(
+            str(i),
+            str(d),
+        )
+    
+    console = Console()
+    console.print(table)
+# end def
 
 
 def main(config):
@@ -310,7 +330,8 @@ def main(config):
             # if (step + 1) % 5 == 0:  # estimated to be around 30 mins
             # TODO: Define how the validator normalizes scores before setting weights.
             weights = torch.nn.functional.normalize(scores, p=1.0, dim=0)
-            bt.logging.info(f"Setting weights: {weights}")
+            bt.logging.info(f"Setting weights:")
+            log_table(data=weights)
             # This is a crucial step that updates the incentive mechanism on the Bittensor blockchain.
             # Miners with higher scores (or weights) receive a larger share of TAO rewards on this subnet.
             result = subtensor.set_weights(
