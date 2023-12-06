@@ -233,7 +233,7 @@ def main(config):
                 bt.logging.success(f"Found data for key {key}!")
             else:
                 synapse.data = None
-                bt.logging.error(f"Data not found for key {key}!")
+                bt.logging.warning(f"Data not found for key {key}!")
         
         except Exception as e:
             bt.logging.error(f"Error retrieving data from db: {e}")

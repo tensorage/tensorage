@@ -25,6 +25,8 @@ import torch
 import random
 import argparse
 import traceback
+import pickle
+# import wandb
 import bittensor as bt
 
 # Custom modules
@@ -37,9 +39,13 @@ from tqdm import tqdm
 import storage
 import allocate
 
-CHUNK_SIZE = 1 << 22    # 4 MB
-DEFAULT_N_CHUNKS = 1 << 8  # the minimum number of chunks a miner should provide at least is 1GB (CHUNK_SIZE * DEFAULT_N_CHUNKS)
+CHUNK_SIZE = 1 << 22  # 4 MB
+DEFAULT_N_CHUNKS = (
+    1 << 8
+)  # the minimum number of chunks a miner should provide at least is 1GB (CHUNK_SIZE * DEFAULT_N_CHUNKS)
 MIN_N_CHUNKS = 10
+
+
 # Step 2: Set up the configuration parser
 # This function is responsible for setting up and parsing command-line arguments.
 def get_config():
@@ -78,8 +84,13 @@ def get_config():
     if not os.path.exists(config.full_path):
         os.makedirs(config.full_path, exist_ok=True)
 
+    # Ensure the db_root_path directory exists.
+    if not os.path.exists(config.db_root_path):
+        os.makedirs(config.db_root_path, exist_ok=True)
+
     # Return the parsed config.
     return config
+
 
 def main(config):
     # Set up logging with the provided configuration and directory.
@@ -125,7 +136,16 @@ def main(config):
     bt.logging.info("Building validation weights.")
     alpha = 0.9
     scores = torch.ones_like(metagraph.S, dtype=torch.float32)
-    bt.logging.info(f"Weights: {scores}")
+
+    # Load previously stored verified_allocations
+    old_verified_allocations = []
+    if os.path.exists(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl")):
+        bt.logging.info("Previous weights found.")
+        with open(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl"), 'rb') as f:
+            old_verified_allocations = pickle.load(f)
+        bt.logging.success("✅ Successfully restored previously-saved weights.")
+    else:
+        bt.logging.info("Previous weights state not found.")
 
     # Generate allocations for the validator.
     next_allocations = []
@@ -134,10 +154,18 @@ def main(config):
         db_path = os.path.expanduser(
             f"{config.db_root_path}/{config.wallet.name}/{config.wallet.hotkey}/DB-{hotkey}-{wallet.hotkey.ss58_address}"
         )
+        
+        # Look for old verified allocations for current hotkey
+        n_chunks = 0
+        for allocation in old_verified_allocations:
+            if allocation['miner'] == hotkey:
+                n_chunks = allocation['n_chunks']
+                break
+
         next_allocations.append(
             {
                 "path": db_path,
-                "n_chunks": DEFAULT_N_CHUNKS,
+                "n_chunks": n_chunks if n_chunks else DEFAULT_N_CHUNKS,
                 "seed": f"{hotkey}{wallet.hotkey.ss58_address}",
                 "miner": hotkey,
                 "validator": wallet.hotkey.ss58_address,
@@ -169,9 +197,8 @@ def main(config):
     while True:
         try:
             # Iterate over all miners on the network and validate them.
-            previous_allocations = copy.deepcopy(next_allocations)
             for i, alloc in tqdm(enumerate(next_allocations)):
-                bt.logging.debug(f"Starting")
+                bt.logging.debug(f"Starting validation for miner [uid {i}]")
                 # Dont self validate.
                 if alloc["miner"] == wallet.hotkey.ss58_address:
                     continue
@@ -180,7 +207,9 @@ def main(config):
                 verified_n_chunks = verified_allocations[i]["n_chunks"]
                 new_n_chunks = alloc["n_chunks"]
                 if verified_n_chunks >= new_n_chunks:
-                    chunk_i = str(random.randint(int(new_n_chunks * 0.8), new_n_chunks - 1))
+                    chunk_i = str(
+                        random.randint(int(new_n_chunks * 0.8), new_n_chunks - 1)
+                    )
                 else:
                     chunk_i = str(random.randint(verified_n_chunks, new_n_chunks - 1))
                 bt.logging.debug(f"Validating miner [uid {i}] (chunk_{chunk_i})")
@@ -264,30 +293,52 @@ def main(config):
             for index, uid in enumerate(metagraph.uids):
                 miner_hotkey = metagraph.neurons[uid].axon_info.hotkey
                 try:
-                    allocation_index = next(i for i, obj in enumerate(verified_allocations) if obj['miner'] == miner_hotkey)
-                    score = verified_allocations[allocation_index]['n_chunks']
+                    allocation_index = next(
+                        i
+                        for i, obj in enumerate(verified_allocations)
+                        if obj["miner"] == miner_hotkey
+                    )
+                    score = verified_allocations[allocation_index]["n_chunks"]
                 except StopIteration:
                     score = 0
                 scores[index] = alpha * scores[index] + (1 - alpha) * score
 
             # Periodically update the weights on the Bittensor blockchain.
-            if (step + 1) % 5 == 0:     # estimated to be around 30 mins
-                # TODO: Define how the validator normalizes scores before setting weights.
-                weights = torch.nn.functional.normalize(scores, p=1.0, dim=0)
-                bt.logging.info(f"Setting weights: {weights}")
-                # This is a crucial step that updates the incentive mechanism on the Bittensor blockchain.
-                # Miners with higher scores (or weights) receive a larger share of TAO rewards on this subnet.
-                result = subtensor.set_weights(
-                    netuid=config.netuid,  # Subnet to set weights on.
-                    wallet=wallet,  # Wallet to sign set weights using hotkey.
-                    uids=metagraph.uids,  # Uids of the miners to set weights for.
-                    weights=weights,  # Weights to set for the miners.
-                    # wait_for_inclusion=True,
-                )
-                if result:
-                    bt.logging.success("✅ Successfully set weights.")
-                else:
-                    bt.logging.error("❌ Failed to set weights.")
+            # if (step + 1) % 5 == 0:  # estimated to be around 30 mins
+            # TODO: Define how the validator normalizes scores before setting weights.
+            weights = torch.nn.functional.normalize(scores, p=1.0, dim=0)
+            bt.logging.info(f"Setting weights: {weights}")
+            # This is a crucial step that updates the incentive mechanism on the Bittensor blockchain.
+            # Miners with higher scores (or weights) receive a larger share of TAO rewards on this subnet.
+            result = subtensor.set_weights(
+                netuid=config.netuid,  # Subnet to set weights on.
+                wallet=wallet,  # Wallet to sign set weights using hotkey.
+                uids=metagraph.uids,  # Uids of the miners to set weights for.
+                weights=weights,  # Weights to set for the miners.
+                # wait_for_inclusion=True,
+            )
+            if result:
+                bt.logging.success("✅ Successfully set weights.")
+                
+                # TODO: Store the weights locally.
+                # Save verified_allocations
+                with open(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl"), 'wb') as f:
+                    pickle.dump(verified_allocations, f)
+                bt.logging.success("✅ Successfully stored weights locally.")
+
+                # TODO: Store the weights on wandb.
+                # # Initialize a new run in Weights & Biases
+                # run = wandb.init(project="salahawk/tensorage", job_type="store_data")
+                # # Create a new artifact with timestamp
+                # artifact = wandb.Artifact(f'verified_allocations_{int(time.time())}', type='dataset')
+                # # Add the file to the artifact
+                # artifact.add_file(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl"))
+                # # Log the artifact
+                # run.log_artifact(artifact)
+
+                # bt.logging.success("✅ Successfully stored weights on wandb.")
+            else:
+                bt.logging.error("❌ Failed to set weights.")
 
             # End the current step and prepare for the next iteration.
             step += 1
