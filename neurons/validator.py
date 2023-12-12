@@ -67,6 +67,18 @@ def get_config():
         help="Maximum number of chunks a miner can provide to your validator",
     )
     parser.add_argument(
+        "--no_store_weights",
+        action="store_true",
+        default=False,
+        help="If true, the validator will store newly-set weights",
+    )
+    parser.add_argument(
+        "--no_restore_weights",
+        action="store_true",
+        default=False,
+        help="If true, the validator will keep the weights from the previous run",
+    )
+    parser.add_argument(
         "--no_bridge", action="store_true", help="Run without bridging to the network."
     )
     # Adds override arguments for network and netuid.
@@ -103,18 +115,22 @@ def get_config():
     return config
 
 
-def log_table(data, title: str="Score"):
+def log_table(scores, n_chunks_list, hotkeys, title: str="Score"):
     """
     Purpose: show a table to console
     """
     table = Table(title=title)
-    table.add_column("UID", justify="right", style="cyan", no_wrap=True)
-    table.add_column("Score", justify="right", style="cyan", no_wrap=True)
+    table.add_column("UID", justify="right", style="cyan")
+    table.add_column("Score", justify="right", style="cyan")
+    table.add_column("Hotkey", justify="right", style="cyan")
+    table.add_column("N_CHUNKS", justify="right", style="cyan")
 
-    for i, d in enumerate(data):
+    for i, score in enumerate(scores):
         table.add_row(
             str(i),
-            str(d),
+            str(score),
+            str(hotkeys[i]),
+            str(n_chunks_list[i]),
         )
     
     console = Console()
@@ -169,13 +185,16 @@ def main(config):
 
     # Load previously stored verified_allocations
     old_verified_allocations = []
-    if os.path.exists(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl")):
-        bt.logging.info("Previous weights found.")
-        with open(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl"), 'rb') as f:
-            old_verified_allocations = pickle.load(f)
-        bt.logging.success("✅ Successfully restored previously-saved weights.")
+    if not config.no_restore_weights:
+        if os.path.exists(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl")):
+            bt.logging.info("Previous weights found.")
+            with open(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl"), 'rb') as f:
+                old_verified_allocations = pickle.load(f)
+            bt.logging.success("✅ Successfully restored previously-saved weights.")
+        else:
+            bt.logging.info("Previous weights state not found.")
     else:
-        bt.logging.info("Previous weights state not found.")
+        bt.logging.info("Ignoring previous weights state.")
 
     # Generate allocations for the validator.
     next_allocations = []
@@ -187,10 +206,11 @@ def main(config):
         
         # Look for old verified allocations for current hotkey
         n_chunks = 0
-        for allocation in old_verified_allocations:
-            if allocation['miner'] == hotkey:
-                n_chunks = allocation['n_chunks']
-                break
+        if not config.no_restore_weights and len(old_verified_allocations):
+            for allocation in old_verified_allocations:
+                if allocation['miner'] == hotkey:
+                    n_chunks = allocation['n_chunks']
+                    break
 
         next_allocations.append(
             {
@@ -222,7 +242,7 @@ def main(config):
     )
 
     # Step 7: The Main Validation Loop
-    bt.logging.info("Starting validator loop.")
+    bt.logging.info("🚀 Starting validator loop.")
     step = 0
     while True:
         # Measure the time it takes to validate all the miners running on the subnet.
@@ -231,7 +251,7 @@ def main(config):
         try:
             # Iterate over all miners on the network and validate them.
             for i, alloc in tqdm(enumerate(next_allocations)):
-                bt.logging.debug(f"Starting validation for miner [uid {i}]")
+                bt.logging.debug("🔍 Validating miner [uid {}]".format(i))
                 # Dont self validate.
                 if alloc["miner"] == wallet.hotkey.ss58_address:
                     continue
@@ -245,7 +265,7 @@ def main(config):
                     )
                 else:
                     chunk_i = str(random.randint(verified_n_chunks, new_n_chunks - 1))
-                bt.logging.debug(f"Validating miner [uid {i}] (chunk_{chunk_i})")
+                bt.logging.debug(f"🔈 Querying mienr [uid {i}] (chunk_{chunk_i})")
 
                 # Get the hash of the data to validate from the database.
                 db = sqlite3.connect(alloc["path"])
@@ -346,7 +366,7 @@ def main(config):
             # TODO: Define how the validator normalizes scores before setting weights.
             weights = torch.nn.functional.normalize(scores, p=1.0, dim=0)
             bt.logging.info(f"Setting weights:")
-            log_table(data=weights)
+            log_table(scores=weights, n_chunks_list=[alloc["n_chunks"] for alloc in verified_allocations], hotkeys=metagraph.hotkeys)
             # This is a crucial step that updates the incentive mechanism on the Bittensor blockchain.
             # Miners with higher scores (or weights) receive a larger share of TAO rewards on this subnet.
             result = subtensor.set_weights(
@@ -359,29 +379,31 @@ def main(config):
             if result:
                 bt.logging.success("✅ Successfully set weights.")
                 
-                # TODO: Store the weights locally.
-                # Save verified_allocations
-                with open(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl"), 'wb') as f:
-                    pickle.dump(verified_allocations, f)
-                bt.logging.success("✅ Successfully stored weights locally.")
+                if not config.no_store_weights:
+                    # TODO: Store the weights locally.
+                    # Save verified_allocations
+                    with open(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl"), 'wb') as f:
+                        pickle.dump(verified_allocations, f)
+                    bt.logging.success("✅ Successfully stored weights locally.")
 
-                # TODO: Store the weights on wandb.
-                # # Initialize a new run in Weights & Biases
-                # run = wandb.init(project="salahawk/tensorage", job_type="store_data")
-                # # Create a new artifact with timestamp
-                # artifact = wandb.Artifact(f'verified_allocations_{int(time.time())}', type='dataset')
-                # # Add the file to the artifact
-                # artifact.add_file(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl"))
-                # # Log the artifact
-                # run.log_artifact(artifact)
+                    # TODO: Store the weights on wandb.
+                    # # Initialize a new run in Weights & Biases
+                    # run = wandb.init(project="salahawk/tensorage", job_type="store_data")
+                    # # Create a new artifact with timestamp
+                    # artifact = wandb.Artifact(f'verified_allocations_{int(time.time())}', type='dataset')
+                    # # Add the file to the artifact
+                    # artifact.add_file(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl"))
+                    # # Log the artifact
+                    # run.log_artifact(artifact)
 
-                # bt.logging.success("✅ Successfully stored weights on wandb.")
+                    # bt.logging.success("✅ Successfully stored weights on wandb.")
             else:
                 bt.logging.error("❌ Failed to set weights.")
 
 
             # End the current step and prepare for the next iteration.
             step += 1
+
             # Log the time it took to validate all miners.
             bt.logging.info(
                 f"Finished validation step {step} in {time.time() - start_time} seconds."
