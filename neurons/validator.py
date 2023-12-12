@@ -39,12 +39,12 @@ from tqdm import tqdm
 # import this repo
 import storage
 import allocate
+import utils
 
 CHUNK_SIZE = 1 << 22  # 4 MB
 DEFAULT_N_CHUNKS = (
     1 << 8
 )  # the minimum number of chunks a miner should provide at least is 1GB (CHUNK_SIZE * DEFAULT_N_CHUNKS)
-MIN_N_CHUNKS = 10
 
 
 # Step 2: Set up the configuration parser
@@ -55,6 +55,16 @@ def get_config():
         "--db_root_path",
         default=os.path.expanduser("~/bittensor-db"),
         help="Validator hashes",
+    )
+    parser.add_argument(
+        "--miner_min_chunks",
+        default=256,    # 1 GB
+        help="Minimum number of chunks a miner should provide to your validator",
+    )
+    parser.add_argument(
+        "--miner_max_chunks",
+        default=25600,    # 100 GB
+        help="Maximum number of chunks a miner can provide to your validator",
     )
     parser.add_argument(
         "--no_bridge", action="store_true", help="Run without bridging to the network."
@@ -185,7 +195,7 @@ def main(config):
         next_allocations.append(
             {
                 "path": db_path,
-                "n_chunks": n_chunks if n_chunks else DEFAULT_N_CHUNKS,
+                "n_chunks": utils.validate_min_max_range(n_chunks if n_chunks else DEFAULT_N_CHUNKS, config.miner_min_chunks, config.miner_max_chunks),
                 "seed": f"{hotkey}{wallet.hotkey.ss58_address}",
                 "miner": hotkey,
                 "validator": wallet.hotkey.ss58_address,
@@ -195,7 +205,7 @@ def main(config):
         verified_allocations.append(
             {
                 "path": db_path,
-                "n_chunks": 0,
+                "n_chunks": config.miner_min_chunks,
                 "seed": f"{hotkey}{wallet.hotkey.ss58_address}",
                 "miner": hotkey,
                 "validator": wallet.hotkey.ss58_address,
@@ -264,8 +274,10 @@ def main(config):
                 if miner_data == None:
                     # The miner could not respond with the data.
                     # We reduce the estimated allocation for the miner.
-                    next_allocations[i]["n_chunks"] = max(
-                        int(next_allocations[i]["n_chunks"] * 0.9), MIN_N_CHUNKS
+                    next_allocations[i]["n_chunks"] = utils.validate_min_max_range(
+                        int(next_allocations[i]["n_chunks"] * 0.9), 
+                        config.miner_min_chunks,
+                        config.miner_max_chunks
                     )
                     verified_allocations[i]["n_chunks"] = min(
                         next_allocations[i]["n_chunks"],
@@ -286,8 +298,10 @@ def main(config):
                         verified_allocations[i]["n_chunks"] = next_allocations[i][
                             "n_chunks"
                         ]
-                        next_allocations[i]["n_chunks"] = int(
-                            next_allocations[i]["n_chunks"] * 1.1
+                        next_allocations[i]["n_chunks"] = utils.validate_min_max_range(
+                            int(next_allocations[i]["n_chunks"] * 1.1),
+                            config.miner_min_chunks,
+                            config.miner_max_chunks
                         )
                         bt.logging.debug(
                             f"✅ Miner [uid {i}] provided correct response, increasing allocation to: {next_allocations[i]['n_chunks']}"
@@ -295,8 +309,10 @@ def main(config):
                     else:
                         # The miner has provided an incorrect response.
                         # We need to decrease our estimation..
-                        next_allocations[i]["n_chunks"] = max(
-                            int(next_allocations[i]["n_chunks"] * 0.9), MIN_N_CHUNKS
+                        next_allocations[i]["n_chunks"] = utils.validate_min_max_range(
+                            int(next_allocations[i]["n_chunks"] * 0.9),
+                            config.miner_min_chunks,
+                            config.miner_max_chunks
                         )
                         verified_allocations[i]["n_chunks"] = min(
                             next_allocations[i]["n_chunks"],
@@ -327,7 +343,6 @@ def main(config):
                 scores[index] = alpha * scores[index] + (1 - alpha) * score
 
             # Periodically update the weights on the Bittensor blockchain.
-            # if (step + 1) % 5 == 0:  # estimated to be around 30 mins
             # TODO: Define how the validator normalizes scores before setting weights.
             weights = torch.nn.functional.normalize(scores, p=1.0, dim=0)
             bt.logging.info(f"Setting weights:")
