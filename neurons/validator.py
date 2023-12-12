@@ -45,7 +45,6 @@ CHUNK_SIZE = 1 << 22  # 4 MB
 DEFAULT_N_CHUNKS = (
     1 << 8
 )  # the minimum number of chunks a miner should provide at least is 1GB (CHUNK_SIZE * DEFAULT_N_CHUNKS)
-MIN_N_CHUNKS = 10
 
 
 # Step 2: Set up the configuration parser
@@ -60,12 +59,12 @@ def get_config():
     parser.add_argument(
         "--miner_min_chunks",
         default=256,    # 1 GB
-        help="Minimum number of chunks a miner should provide",
+        help="Minimum number of chunks a miner should provide to your validator",
     )
     parser.add_argument(
         "--miner_max_chunks",
-        default=256000,    # 100 GB
-        help="Maximum number of chunks a miner should provide",
+        default=25600,    # 100 GB
+        help="Maximum number of chunks a miner can provide to your validator",
     )
     parser.add_argument(
         "--no_bridge", action="store_true", help="Run without bridging to the network."

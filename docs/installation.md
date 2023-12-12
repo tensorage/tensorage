@@ -63,16 +63,57 @@ pm2 start neurons/miner.py --name miner --interpreter python3 --
     # --restart <OPTIONAL: restart the partitioning process from the beginning, otherwise restarts from the last created chunk. default = False> # If true, the partitioning process restarts instead using a checkpoint.
 ```
 
+- Example 1 (with default values):
+```bash
+pm2 start neurons/miner.py --name miner --interpreter python3 -- --wallet.name default --wallet.hotkey default --logging.debug --logging.trace
+```
+
+- Example 2 (with custom values):
+```bash
+pm2 start neurons/miner.py --name miner --interpreter python3 -- 
+    --wallet.name default
+    --wallet.hotkey default
+    --db_root_path ~/bittensor-db
+    --logging.debug
+    --logging.trace
+    --threshold 0.9
+    --netuid 7
+    --subtensor.network local
+    --restart
+```
+
 ## Validating
 
 To run the validator
 ```bash
 pm2 start neurons/validator.py --name validator --interpreter python3 -- 
+    --validator
     --wallet.name <OPTIONAL: your miner wallet, default = default> # Must be created using the bittensor-cli, btcli wallet new_coldkey
     --wallet.hotkey <OPTIONAL: your validator hotkey, default = default> # Must be created using the bittensor-cli btcli wallet new_hotkey
     --db_root_path <OPTIONAL: path where you want the DB files stored, default = "~/bittensor-db">  # This is where the partition will be created storing network data.
     --logging.debug # Run in debug mode, alternatively --logging.trace for trace mode
     --netuid <OPTIONAL: the subnet netuid, defualt = 7> # This is the netuid of the storage subnet you are serving on.
     --subtensor.network local # <OPTIONAL: the bittensor chain endpoint, default = finney, local, test> : The chain endpoint to use to generate the partition. (highly recommend running subtensor locally)
+    --miner_min_chunks <OPTIONAL: the minimum number of chunks miners should provide to your validator, default = 256> # The minimum number of chunks miners should provide to this validator
+    --miner_max_chunks <OPTIONAL: the maximum number of chunks miners can provide to your validator, default = 2560000000> # The maximum number of chunks miners should provide to this validator
+```
+
+- Example 1 (with default values):
+```bash
+pm2 start neurons/validator.py --name validator --interpreter python3 -- --validator --wallet.name default --wallet.hotkey default --logging.debug --logging.trace
+```
+
+- Example 2 (with custom values):
+```bash
+pm2 start neurons/validator.py --name validator --interpreter python3 -- 
     --validator
+    --wallet.name default
+    --wallet.hotkey default
+    --db_root_path ~/bittensor-db
+    --logging.debug
+    --logging.trace
+    --netuid 7
+    --subtensor.network local
+    --miner_min_chunks 256
+    --miner_max_chunks 2560000000
 ```
