@@ -115,18 +115,22 @@ def get_config():
     return config
 
 
-def log_table(data, title: str="Score"):
+def log_table(scores, n_chunks_list, hotkeys, title: str="Score"):
     """
     Purpose: show a table to console
     """
     table = Table(title=title)
-    table.add_column("UID", justify="right", style="cyan", no_wrap=True)
-    table.add_column("Score", justify="right", style="cyan", no_wrap=True)
+    table.add_column("UID", justify="right", style="cyan")
+    table.add_column("Score", justify="right", style="cyan")
+    table.add_column("Hotkey", justify="right", style="cyan")
+    table.add_column("N_CHUNKS", justify="right", style="cyan")
 
-    for i, d in enumerate(data):
+    for i, score in enumerate(scores):
         table.add_row(
             str(i),
-            str(d),
+            str(score),
+            str(hotkeys[i]),
+            str(n_chunks_list[i]),
         )
     
     console = Console()
@@ -202,7 +206,7 @@ def main(config):
         
         # Look for old verified allocations for current hotkey
         n_chunks = 0
-        if config.restore_weights and len(old_verified_allocations):
+        if not config.no_restore_weights and len(old_verified_allocations):
             for allocation in old_verified_allocations:
                 if allocation['miner'] == hotkey:
                     n_chunks = allocation['n_chunks']
@@ -362,7 +366,7 @@ def main(config):
             # TODO: Define how the validator normalizes scores before setting weights.
             weights = torch.nn.functional.normalize(scores, p=1.0, dim=0)
             bt.logging.info(f"Setting weights:")
-            log_table(data=weights)
+            log_table(scores=weights, n_chunks_list=[alloc["n_chunks"] for alloc in verified_allocations], hotkeys=metagraph.hotkeys)
             # This is a crucial step that updates the incentive mechanism on the Bittensor blockchain.
             # Miners with higher scores (or weights) receive a larger share of TAO rewards on this subnet.
             result = subtensor.set_weights(
