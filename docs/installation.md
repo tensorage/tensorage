@@ -65,7 +65,7 @@ pm2 start neurons/miner.py --name miner --interpreter python3 --
 
 - Example 1 (with default values):
 ```bash
-pm2 start neurons/miner.py --name miner --interpreter python3 -- --wallet.name default --wallet.hotkey default --logging.debug --logging.trace
+pm2 start neurons/miner.py --name miner --interpreter python3 -- --wallet.name default --wallet.hotkey default --logging.debug
 ```
 
 - Example 2 (with custom values):
@@ -75,7 +75,6 @@ pm2 start neurons/miner.py --name miner --interpreter python3 --
     --wallet.hotkey default
     --db_root_path ~/bittensor-db
     --logging.debug
-    --logging.trace
     --threshold 0.9
     --netuid 7
     --subtensor.network local
