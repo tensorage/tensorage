@@ -1,5 +1,6 @@
 import os
 import json
+import pickle
 import torch
 import shutil
 import typing
@@ -192,15 +193,6 @@ def generate(
         if not confirm_generation(allocations):
             exit()
 
-    # # Delete all databases if restart flag is true
-    # if restart and allocations:
-    #     db_root_path = os.path.dirname(allocations[0]['path'])
-    #     try:
-    #         shutil.rmtree(db_root_path)
-    #         bt.logging.info(f"Folder '{db_root_path}' and its contents successfully deleted.")
-    #     except OSError as e:
-    #         bt.logging.error(f"Error: {e}")
-
     # Finally, we run the generation process. This is done using a ThreadPoolExecutor, which allows us to run multiple tasks concurrently.
     # For each allocation, we submit two tasks to the executor: one for generating the hash, and one for generating the data.
     # If only_hash is set to True, we skip the data generation task.
@@ -287,12 +279,13 @@ def allocate(
     metagraph: bt.metagraph,  # Metagraph object
     threshold: float = 0.9,  # Threshold for the allocation.
     hash: bool = False,  # If True, the allocation is for a hash database. If False, the allocation is for a data database. Default is False.
+    restart: bool = False,  # If True, the database will be restarted. Default is False.
 ) -> typing.List[dict]:
     """
     This function calculates the allocation of space for each hotkey in the metagraph.
 
     Args:
-        - db_path (str): The path to the data database.
+        - db_root_path (str): The path to the data database.
         - wallet (bt.wallet): The wallet object containing the name and hotkey.
         - metagraph (bt.metagraph): The metagraph object containing the hotkeys.
         - threshold (float): The threshold for the allocation. Default is 0.9.
@@ -300,13 +293,48 @@ def allocate(
     Returns:
         - list: A list of dictionaries. Each dictionary contains the allocation details for a hotkey.
     """
-    # Calculate the path to the wallet database.
     wallet_db_path = os.path.join(db_root_path, wallet.name, wallet.hotkey_str)
-    if not os.path.exists(wallet_db_path):
-        os.makedirs(wallet_db_path)
+    available_space = 0
 
-    # Calculate the available space in the data database.
-    available_space = get_available_space(wallet_db_path)
+    # Consider restart flag
+    bt.logging.error(f"restart: {restart}")
+    # Delete all databases if restart flag is true
+    if restart:
+        if os.path.exists(db_root_path):
+            try:
+                shutil.rmtree(db_root_path)
+                bt.logging.info(f"Folder '{db_root_path}' and its contents successfully deleted.")
+            except OSError as e:
+                bt.logging.error(f"Error: {e}")
+    
+    else:
+        if not os.path.exists(os.path.join(db_root_path, 'info.pkl')):
+            bt.logging.info("Previous allocation details not found. Allocation starts from the ground.")
+        else:
+            # Load the value set in info.pkl file in db_root_path
+            try:
+                with open(os.path.join(db_root_path, 'info.pkl'), 'rb') as f:
+                    info = pickle.load(f)
+                    available_space = info['mining_space']
+                    bt.logging.info(f"Previous allocation details found - {human_readable_size(available_space)}.")
+
+            except (FileNotFoundError, EOFError, pickle.UnpicklingError):
+                bt.logging.info("Failed to load previous allocation details. Allocation starts from the ground.")
+                raise
+    
+    # Calculate the available space of the directory
+    if available_space == 0:
+        # Calculate the path to the wallet database.
+        if not os.path.exists(wallet_db_path):
+            os.makedirs(wallet_db_path)
+
+        # Calculate the available space in the data database.
+        available_space = get_available_space(wallet_db_path)
+
+        # Save the available space in info.pkl file in db_root_path
+        with open(os.path.join(db_root_path, 'info.pkl'), 'wb') as f:
+            info = {'mining_space': available_space}
+            pickle.dump(info, f)
 
     # Calculate the filling space based on the available space and the threshold.
     filling_space = available_space * threshold
