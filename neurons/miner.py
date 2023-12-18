@@ -179,6 +179,7 @@ def main(config):
             metagraph=metagraph,
             threshold=config.threshold,
             hash=False,
+            restart=config.restart,
         )
     }
 
@@ -233,10 +234,10 @@ def main(config):
                 bt.logging.success(f"Found data for key {key}!")
             else:
                 synapse.data = None
-                bt.logging.warning(f"Data not found for key {key}!")
+                bt.logging.debug(f"Data not found for key {key}!")
         
         except Exception as e:
-            bt.logging.error(f"Error retrieving data from db: {e}")
+            bt.logging.debug(f"Error retrieving data from db: {e}")
 
         # Result
         return synapse
@@ -314,7 +315,8 @@ def main(config):
                         wallet=wallet,
                         metagraph=metagraph,
                         threshold=config.threshold,
-                        hash=False
+                        hash=False,
+                        restart=False,
                     )
                 }
                 bt.logging.info(f"Reallocating ...")
