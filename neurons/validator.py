@@ -57,6 +57,11 @@ def get_config():
         help="Validator hashes",
     )
     parser.add_argument(
+        "--workers",
+        default=10,
+        help="The number of concurrent workers to use for hash generation",
+    )
+    parser.add_argument(
         "--miner_min_chunks",
         default=256,    # 1 GB
         help="Minimum number of chunks a miner should provide to your validator",
@@ -237,7 +242,7 @@ def main(config):
     allocate.generate(
         allocations=next_allocations,  # The allocations to generate.
         no_prompt=True,  # If True, no prompt will be shown
-        workers=10,  # The number of concurrent workers to use for generation. Default is 10.
+        workers=config.workers,  # The number of concurrent workers to use for generation. Default is 10.
         restart=True,  # Dont restart the generation from empty files.
     )
 
@@ -265,7 +270,7 @@ def main(config):
                     )
                 else:
                     chunk_i = str(random.randint(verified_n_chunks, new_n_chunks - 1))
-                bt.logging.debug(f"🔈 Querying mienr [uid {i}] (chunk_{chunk_i})")
+                bt.logging.debug(f"🔈 Querying miner [uid {i}] (chunk_{chunk_i})")
 
                 # Get the hash of the data to validate from the database.
                 db = sqlite3.connect(alloc["path"])
