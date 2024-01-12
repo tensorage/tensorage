@@ -59,6 +59,7 @@ def get_config():
     parser.add_argument(
         "--workers",
         default=10,
+        type=int,
         help="The number of concurrent workers to use for hash generation",
     )
     parser.add_argument(

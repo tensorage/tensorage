@@ -74,6 +74,13 @@ def get_config():
         required=False,
         help="Size of path to fill",
     )
+    # The number of workers to run concurrently to generate hashing data
+    parser.add_argument(
+        "--workers",
+        default=10,
+        type=int,
+        help="The number of concurrent workers to use for hash generation",
+    )
     # If set, the miner will realocate its DB entirely (this is expensive and not recommended)
     parser.add_argument(
         "--restart", action="store_true", default=False, help="Restart the db."
