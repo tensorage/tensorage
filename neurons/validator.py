@@ -37,7 +37,7 @@ from rich.table import Table
 from tqdm import tqdm
 
 # import this repo
-import storage
+import tensorage
 import allocate
 import utils
 
@@ -293,7 +293,7 @@ def main(config):
                 # Query the miner for the data.
                 miner_data = dendrite.query(
                     metagraph.axons[i],
-                    storage.protocol.Retrieve(key=chunk_i),
+                    tensorage.protocol.Retrieve(key=chunk_i),
                     deserialize=True,
                 )
 
