@@ -90,6 +90,10 @@ def get_config():
     )
     # Adds override arguments for network and netuid.
     parser.add_argument("--netuid", type=int, default=7, help="The chain subnet uid.")
+    # If set, the validator will reallocate its DB entirely (this is expensive and not recommended)
+    parser.add_argument(
+        "--restart", action="store_true", default=False, help="Restart the db."
+    )
     # Adds subtensor specific arguments i.e. --subtensor.chain_endpoint ... --subtensor.network ...
     bt.subtensor.add_args(parser)
     # Adds logging specific arguments i.e. --logging.debug ..., --logging.trace .. or --logging.logging_dir ...
@@ -285,7 +289,7 @@ def main(config):
         allocations=next_allocations,  # The allocations to generate.
         no_prompt=True,  # If True, no prompt will be shown
         workers=config.workers,  # The number of concurrent workers to use for generation. Default is 10.
-        restart=True,  # Dont restart the generation from empty files.
+        restart=config.restart,  # Dont restart the generation from empty files.
     )
 
     def validate_miners(i, alloc):
