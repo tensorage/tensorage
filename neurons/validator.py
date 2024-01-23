@@ -103,6 +103,16 @@ def get_config():
     # Parse the config (will take command-line arguments if provided)
     config = bt.config(parser)
 
+    # Delete pk file if restart flag is true
+    if config.restart:
+        pkl_file_path = os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl")
+        if os.path.exists(pkl_file_path ):
+            try:
+                os.remove(pkl_file_path )
+                bt.logging.info(f"PKL file successfully deleted.")
+            except OSError as e:
+                bt.logging.error(f"Error: {e}")
+
     # Step 3: Set up logging directory
     # Logging is crucial for monitoring and debugging purposes.
     config.full_path = os.path.expanduser(
@@ -289,7 +299,7 @@ def main(config):
         allocations=next_allocations,  # The allocations to generate.
         no_prompt=True,  # If True, no prompt will be shown
         workers=config.workers,  # The number of concurrent workers to use for generation. Default is 10.
-        restart=config.restart,  # Dont restart the generation from empty files.
+        restart=False,  # Dont restart the generation from empty files.
     )
 
     def validate_miners(i, alloc):
