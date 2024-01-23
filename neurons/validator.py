@@ -227,7 +227,7 @@ def main(config):
         verified_allocations.append(
             {
                 "path": db_path,
-                "n_chunks": config.miner_min_chunks,
+                "n_chunks": utils.validate_min_max_range(n_chunks if n_chunks else DEFAULT_N_CHUNKS, config.miner_min_chunks, config.miner_max_chunks),
                 "seed": f"{hotkey}{wallet.hotkey.ss58_address}",
                 "miner": hotkey,
                 "validator": wallet.hotkey.ss58_address,
@@ -236,7 +236,7 @@ def main(config):
         )
 
     # Periodically update the weights on the Bittensor blockchain.
-    def udpate_scores():
+    def update_scores():
         # TODO: Define how the validator normalizes scores before setting weights.
         weights = torch.nn.functional.normalize(scores, p=1.0, dim=0)
         bt.logging.info(f"Setting weights:")
@@ -250,6 +250,7 @@ def main(config):
             weights=weights,  # Weights to set for the miners.
             # wait_for_inclusion=True,
         )
+        # result = 1
 
         if result:
             bt.logging.success("✅ Successfully set weights.")
@@ -275,9 +276,9 @@ def main(config):
         else:
             bt.logging.error("❌ Failed to set weights.")
 
-        threading.Timer(600, udpate_scores).start() # Set weight every 10 minutes.
+        threading.Timer(600, update_scores).start() # Set weight every 10 minutes.
 
-    udpate_scores()
+    update_scores()
 
     # Generate the hash allocations.
     allocate.generate(
