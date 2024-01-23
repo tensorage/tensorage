@@ -54,7 +54,7 @@ def get_config() -> bt.config:
         "--workers",
         required=False,
         type=int,
-        default=10,
+        default=256,
         help="Number of concurrent workers to use.",
     )
     bt.wallet.add_args(parser)
