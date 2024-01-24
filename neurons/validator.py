@@ -441,7 +441,7 @@ def main(config):
             metagraph = subtensor.metagraph(config.netuid)
 
             # Update allocations if hotkey of uid changed
-            for i, hotkey in tqdm(metagraph.hotkeys):
+            for i, hotkey in tqdm(enumerate(metagraph.hotkeys)):
                 if next_allocations[i]["miner"] == hotkey: # No hotkey change for this uid
                     continue
 
