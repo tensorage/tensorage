@@ -439,6 +439,35 @@ def main(config):
 
             # Resync our local state with the latest state from the blockchain.
             metagraph = subtensor.metagraph(config.netuid)
+
+            # Update allocations if hotkey of uid changed
+            for i, hotkey in tqdm(metagraph.hotkeys):
+                if next_allocations[i]["miner"] == hotkey: # No hotkey change for this uid
+                    continue
+
+                # Old Hotkey was deregistered and new Hotkey registered on this uid so reset the allocation for this uid
+                db_path = os.path.expanduser(
+                    f"{config.db_root_path}/{config.wallet.name}/{config.wallet.hotkey}/DB-{hotkey}-{wallet.hotkey.ss58_address}"
+                )
+
+                next_allocations[i] = {
+                        "path": db_path,
+                        "n_chunks": utils.validate_min_max_range(DEFAULT_N_CHUNKS, config.miner_min_chunks, config.miner_max_chunks),
+                        "seed": f"{hotkey}{wallet.hotkey.ss58_address}",
+                        "miner": hotkey,
+                        "validator": wallet.hotkey.ss58_address,
+                        "hash": True,
+                }
+
+                verified_allocations[i] = {
+                        "path": db_path,
+                        "n_chunks": utils.validate_min_max_range(DEFAULT_N_CHUNKS, config.miner_min_chunks, config.miner_max_chunks),
+                        "seed": f"{hotkey}{wallet.hotkey.ss58_address}",
+                        "miner": hotkey,
+                        "validator": wallet.hotkey.ss58_address,
+                        "hash": True,
+                }
+
             # Wait a block step.
             time.sleep(20)
 
