@@ -53,7 +53,8 @@ def get_config() -> bt.config:
     parser.add_argument(
         "--workers",
         required=False,
-        default=10,
+        type=int,
+        default=256,
         help="Number of concurrent workers to use.",
     )
     bt.wallet.add_args(parser)
@@ -297,7 +298,7 @@ def allocate(
     available_space = 0
 
     # Consider restart flag
-    bt.logging.error(f"restart: {restart}")
+    bt.logging.info(f"restart: {restart}")
     # Delete all databases if restart flag is true
     if restart:
         if os.path.exists(db_root_path):

@@ -200,34 +200,31 @@ fn main() {
     } else {
         // Generate and store chunks
         pb.inc(start_index as u64);
+        let mut data_to_insert = Vec::new();
+
         for i in start_index..num_chunks {
             let (chunk_data, chunk_hash) = chunk_gen.next();
             let hash_hex = hex::encode(&chunk_hash);
-
+        
             // Store the id, data, hash, and rng_state
             let insert_sql = format!(
                 "INSERT INTO DB{} (id, data, hash, flag, rng_state) VALUES (?, ?, ?, ?, ?)", 
                 seed_value
             );
-
-            // Optionally only store the data hash
-            // log::info!("Set in DB id: {} seed: {:?}", i, chunk_gen.seed.to_vec());
-
+        
+            // Prepare the data to be inserted
             if hash {
                 // Store only the hash.
-                conn.execute(
-                    &insert_sql, 
-                    params![i as i64, "", hash_hex, "F", chunk_gen.seed.to_vec()]
-                ).expect("Failed to insert into database");
+                data_to_insert.push((i as i64, "".to_string(), hash_hex, "F".to_string(), chunk_gen.seed.to_vec()));
             } else {
                 // Store all the data.
-                conn.execute(
-                    &insert_sql, 
-                    params![i as i64, chunk_data, hash_hex, "F", chunk_gen.seed.to_vec()]
-                ).expect("Failed to insert into database");
+                data_to_insert.push((i as i64, chunk_data, hash_hex, "F".to_string(), chunk_gen.seed.to_vec()));
             }
             pb.inc(1);
         };
+        
+        // Execute the insert command once with all the data
+        conn.executemany(&insert_sql, data_to_insert.iter()).expect("Failed to insert into database");
         pb.finish();
 
         // Get current state
