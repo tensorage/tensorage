@@ -446,6 +446,8 @@ def main(config):
                     continue
 
                 # Old Hotkey was deregistered and new Hotkey registered on this uid so reset the allocation for this uid
+                bt.logging.info(f"✨ Found new miner. Hotkey is {hotkey}")
+
                 db_path = os.path.expanduser(
                     f"{config.db_root_path}/{config.wallet.name}/{config.wallet.hotkey}/DB-{hotkey}-{wallet.hotkey.ss58_address}"
                 )
