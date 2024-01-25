@@ -2,11 +2,13 @@ import os
 import tensorage
 import bittensor as bt
 import subprocess
-
-current_version = tensorage.__version__
+import requests
+import base64
+import re
 
 def check_version():
     latest_version = get_version()
+    current_version = tensorage.__version__
     print(f"Current version: {current_version}")
     print(f"Latest version: {latest_version}")
 
@@ -19,7 +21,7 @@ def check_version():
         os._exit(0)
 
 # Get tensorage version from git repo
-def get_version(line_number: int = 31):
+def get_version(line_number: int = 30):
     url = "https://api.github.com/repos/tensorage/tensorage/contents/tensorage/__init__.py"
     response = requests.get(url)
     if not response.ok:
@@ -32,7 +34,7 @@ def get_version(line_number: int = 31):
     if line_number > len(lines):
         raise Exception("Line number exceeds file length")
 
-    version_line = lines[line_number - 1]
+    version_line = lines[line_number - 11]
     version_match = re.search(r'__version__ = "(.*?)"', version_line)
     if not version_match:
         raise Exception("Version information not found in the specified line")
