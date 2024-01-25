@@ -19,7 +19,7 @@ def check_version():
         os._exit(0)
 
 # Get tensorage version from git repo
-def get_version(line_number: int = 22) -> Optional[str]:
+def get_version(line_number: int = 31):
     url = "https://api.github.com/repos/tensorage/tensorage/contents/tensorage/__init__.py"
     response = requests.get(url)
     if not response.ok:
