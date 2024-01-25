@@ -17,6 +17,7 @@ def check_version():
         current_version = latest_version
         subprocess.run(["git", "reset", "--hard"])
         subprocess.run(["git", "pull"])
+        subprocess.run(["pip", "install", "-r", "requirements.txt"])
         subprocess.run(["pip", "install", "-e", "."])
         os._exit(0)
 
