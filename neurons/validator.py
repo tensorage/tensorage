@@ -70,7 +70,7 @@ def get_config():
     )
     parser.add_argument(
         "--miner_max_chunks",
-        default=2560000,    # 10 TB
+        default=256000,    # 1 TB
         help="Maximum number of chunks a miner can provide to your validator",
     )
     parser.add_argument(
