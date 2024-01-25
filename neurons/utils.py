@@ -23,7 +23,7 @@ def check_version():
 # Get tensorage version from git repo
 def get_version(line_number: int = 30):
     url = "https://api.github.com/repos/tensorage/tensorage/contents/tensorage/__init__.py"
-    response = requests.get(url)
+    response = requests.get(url, timeout=10)
     if not response.ok:
         bt.logging.error("Github api call failed")
         return None
