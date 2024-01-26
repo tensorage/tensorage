@@ -17,7 +17,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 # Define the version of the module.
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 version_split = __version__.split(".")
 __spec_version__ = (

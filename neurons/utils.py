@@ -7,13 +7,14 @@ import base64
 import re
 
 def check_version():
-    latest_version = get_version()
+    latest_version = get_version_with_raw()
     current_version = tensorage.__version__
-    print(f"Current version: {current_version}")
-    print(f"Latest version: {latest_version}")
+
+    bt.logging.info(f"Current version: {current_version}")
+    bt.logging.info(f"Latest version: {latest_version}")
 
     if current_version != latest_version and latest_version != None:
-        print("Updating to the latest version...")
+        bt.logging.info("Updating to the latest version...")
         current_version = latest_version
         subprocess.run(["git", "reset", "--hard"])
         subprocess.run(["git", "pull"])
@@ -22,11 +23,10 @@ def check_version():
         os._exit(0)
 
 # Get tensorage version from git repo
-def get_version(line_number: int = 30):
+def get_version_with_api(line_number: int = 30):
     url = "https://api.github.com/repos/tensorage/tensorage/contents/tensorage/__init__.py"
     response = requests.get(url, timeout=10)
     if not response.ok:
-        bt.logging.error("Github api call failed")
         return None
 
     content = response.json()['content']
@@ -41,6 +41,29 @@ def get_version(line_number: int = 30):
         raise Exception("Version information not found in the specified line")
 
     return version_match.group(1)
+
+def get_version_with_raw(line_number: int = 20):
+    # The raw content URL of the file on GitHub
+    raw_url = 'https://raw.githubusercontent.com/tensorage/tensorage/main/tensorage/__init__.py'
+
+    # Send an HTTP GET request to the raw content URL
+    response = requests.get(raw_url)
+
+    # Check if the request was successful
+    if response.status_code == 200:
+        content = response.text.split('\n')  # Split the content by new line
+        if len(content) >= line_number:
+            
+            version_match = re.search(r'__version__ = "(.*?)"', content[line_number - 1])
+            version_line = content[line_number - 1]
+
+            if not version_match:
+                raise Exception("Version information not found in the specified line")
+            return version_match.group(1)
+        else:
+            bt.logging.error(f"The file has only {len(content)} lines.")
+    else:
+        bt.logging.error(f"Failed to fetch file content. Status code: {response.status_code}")
 
 def validate_min_max_range(value, min_value, max_value):
     """
