@@ -183,6 +183,28 @@ def main(config):
     metagraph = subtensor.metagraph(config.netuid)
     bt.logging.info(f"Metagraph: {metagraph}")
 
+    # The axon handles request processing, allowing validators to send this process requests.
+    async def ping(synapse: tensorage.protocol.Ping) -> tensorage.protocol.Ping:
+        # Send current version 
+        synapse.version = tensorage.__version__
+        return synapse
+        
+    axon = bt.axon(config=config, wallet=wallet)
+    bt.logging.info(f"Axon {axon}")
+
+    # Attach determiners which functions are called when servicing a request.
+    bt.logging.info(f"Attaching forward function to axon.")
+    axon.attach(ping)
+
+    # Serve passes the axon information to the network + netuid we are hosting on.
+    # This will auto-update if the axon port of external ip have changed.
+    bt.logging.info(f"Serving axon {ping} on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}")
+    axon.serve(netuid=config.netuid, subtensor=subtensor)
+
+    # Start  starts the miner's axon, making it active on the network.
+    bt.logging.info(f"Starting axon server on port: {config.axon.port}")
+    axon.start()
+
     # Step 5: Connect the validator to the network
     if wallet.hotkey.ss58_address not in metagraph.hotkeys:
         bt.logging.error(
