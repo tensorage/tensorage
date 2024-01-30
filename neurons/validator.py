@@ -26,6 +26,9 @@ import random
 import argparse
 import traceback
 import pickle
+from concurrent.futures import ThreadPoolExecutor
+import threading
+
 # import wandb
 import bittensor as bt
 
@@ -37,14 +40,12 @@ from rich.table import Table
 from tqdm import tqdm
 
 # import this repo
-import storage
+import tensorage
 import allocate
 import utils
 
 CHUNK_SIZE = 1 << 22  # 4 MB
-DEFAULT_N_CHUNKS = (
-    1 << 8
-)  # the minimum number of chunks a miner should provide at least is 1GB (CHUNK_SIZE * DEFAULT_N_CHUNKS)
+DEFAULT_N_CHUNKS = 25600  # the minimum number of chunks a miner should provide at least is 100GB (CHUNK_SIZE * DEFAULT_N_CHUNKS)
 
 
 # Step 2: Set up the configuration parser
@@ -58,7 +59,7 @@ def get_config():
     )
     parser.add_argument(
         "--workers",
-        default=10,
+        default=256,
         type=int,
         help="The number of concurrent workers to use for hash generation",
     )
@@ -69,7 +70,7 @@ def get_config():
     )
     parser.add_argument(
         "--miner_max_chunks",
-        default=25600,    # 100 GB
+        default=256000,    # 1 TB
         help="Maximum number of chunks a miner can provide to your validator",
     )
     parser.add_argument(
@@ -89,6 +90,10 @@ def get_config():
     )
     # Adds override arguments for network and netuid.
     parser.add_argument("--netuid", type=int, default=7, help="The chain subnet uid.")
+    # If set, the validator will reallocate its DB entirely (this is expensive and not recommended)
+    parser.add_argument(
+        "--restart", action="store_true", default=False, help="Restart the db."
+    )
     # Adds subtensor specific arguments i.e. --subtensor.chain_endpoint ... --subtensor.network ...
     bt.subtensor.add_args(parser)
     # Adds logging specific arguments i.e. --logging.debug ..., --logging.trace .. or --logging.logging_dir ...
@@ -97,6 +102,16 @@ def get_config():
     bt.wallet.add_args(parser)
     # Parse the config (will take command-line arguments if provided)
     config = bt.config(parser)
+
+    # Delete pk file if restart flag is true
+    if config.restart:
+        pkl_file_path = os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl")
+        if os.path.exists(pkl_file_path ):
+            try:
+                os.remove(pkl_file_path )
+                bt.logging.info(f"PKL file successfully deleted.")
+            except OSError as e:
+                bt.logging.error(f"Error: {e}")
 
     # Step 3: Set up logging directory
     # Logging is crucial for monitoring and debugging purposes.
@@ -143,7 +158,6 @@ def log_table(scores, n_chunks_list, hotkeys, title: str="Score"):
     console.print(table)
 # end def
 
-
 def main(config):
     # Set up logging with the provided configuration and directory.
     bt.logging(config=config, logging_dir=config.full_path)
@@ -165,13 +179,31 @@ def main(config):
     subtensor = bt.subtensor(config=config)
     bt.logging.info(f"Subtensor: {subtensor}")
 
-    # Dendrite is the RPC client; it lets us send messages to other nodes (axons) in the network.
-    dendrite = bt.dendrite(wallet=wallet)
-    bt.logging.info(f"Dendrite: {dendrite}")
-
     # The metagraph holds the state of the network, letting us know about other miners.
     metagraph = subtensor.metagraph(config.netuid)
     bt.logging.info(f"Metagraph: {metagraph}")
+
+    # The axon handles request processing, allowing validators to send this process requests.
+    async def ping(synapse: tensorage.protocol.Ping) -> tensorage.protocol.Ping:
+        # Send current version 
+        synapse.version = tensorage.__version__
+        return synapse
+        
+    axon = bt.axon(config=config, wallet=wallet)
+    bt.logging.info(f"Axon {axon}")
+
+    # Attach determiners which functions are called when servicing a request.
+    bt.logging.info(f"Attaching forward function to axon.")
+    axon.attach(ping)
+
+    # Serve passes the axon information to the network + netuid we are hosting on.
+    # This will auto-update if the axon port of external ip have changed.
+    bt.logging.info(f"Serving axon {ping} on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}")
+    axon.serve(netuid=config.netuid, subtensor=subtensor)
+
+    # Start  starts the miner's axon, making it active on the network.
+    bt.logging.info(f"Starting axon server on port: {config.axon.port}")
+    axon.start()
 
     # Step 5: Connect the validator to the network
     if wallet.hotkey.ss58_address not in metagraph.hotkeys:
@@ -231,7 +263,7 @@ def main(config):
         verified_allocations.append(
             {
                 "path": db_path,
-                "n_chunks": config.miner_min_chunks,
+                "n_chunks": utils.validate_min_max_range(n_chunks if n_chunks else DEFAULT_N_CHUNKS, config.miner_min_chunks, config.miner_max_chunks),
                 "seed": f"{hotkey}{wallet.hotkey.ss58_address}",
                 "miner": hotkey,
                 "validator": wallet.hotkey.ss58_address,
@@ -239,114 +271,168 @@ def main(config):
             }
         )
 
+    # Periodically update the weights on the Bittensor blockchain.
+    def update_scores():
+        # TODO: Define how the validator normalizes scores before setting weights.
+        weights = torch.nn.functional.normalize(scores, p=1.0, dim=0)
+        bt.logging.info(f"Setting weights:")
+        log_table(scores=weights, n_chunks_list=[alloc["n_chunks"] for alloc in verified_allocations], hotkeys=metagraph.hotkeys)
+        # This is a crucial step that updates the incentive mechanism on the Bittensor blockchain.
+        # Miners with higher scores (or weights) receive a larger share of TAO rewards on this subnet.
+        result = subtensor.set_weights(
+            netuid=config.netuid,  # Subnet to set weights on.
+            wallet=wallet,  # Wallet to sign set weights using hotkey.
+            uids=metagraph.uids,  # Uids of the miners to set weights for.
+            weights=weights,  # Weights to set for the miners.
+            # wait_for_inclusion=True,
+        )
+        # result = 1
+
+        if result:
+            bt.logging.success("✅ Successfully set weights.")
+            
+            if not config.no_store_weights:
+                # TODO: Store the weights locally.
+                # Save verified_allocations
+                with open(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl"), 'wb') as f:
+                    pickle.dump(verified_allocations, f)
+                bt.logging.success("✅ Successfully stored weights locally.")
+
+                # TODO: Store the weights on wandb.
+                # # Initialize a new run in Weights & Biases
+                # run = wandb.init(project="salahawk/tensorage", job_type="store_data")
+                # # Create a new artifact with timestamp
+                # artifact = wandb.Artifact(f'verified_allocations_{int(time.time())}', type='dataset')
+                # # Add the file to the artifact
+                # artifact.add_file(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl"))
+                # # Log the artifact
+                # run.log_artifact(artifact)
+
+                # bt.logging.success("✅ Successfully stored weights on wandb.")
+        else:
+            bt.logging.error("❌ Failed to set weights.")
+
+        threading.Timer(600, update_scores).start() # Set weight every 10 minutes.
+
+    update_scores()
+
     # Generate the hash allocations.
     allocate.generate(
         allocations=next_allocations,  # The allocations to generate.
         no_prompt=True,  # If True, no prompt will be shown
         workers=config.workers,  # The number of concurrent workers to use for generation. Default is 10.
-        restart=True,  # Dont restart the generation from empty files.
+        restart=False,  # Dont restart the generation from empty files.
     )
+
+    def validate_miners(i, alloc):
+        dendrite = bt.dendrite(wallet=wallet)
+
+        bt.logging.debug("🔍 Validating miner [uid {}]".format(i))
+        # Dont self validate.
+        if alloc["miner"] == wallet.hotkey.ss58_address:
+            return
+
+        # Select a random chunk to validate.
+        verified_n_chunks = verified_allocations[i]["n_chunks"]
+        new_n_chunks = alloc["n_chunks"]
+        if verified_n_chunks >= new_n_chunks:
+            chunk_i = str(
+                random.randint(int(new_n_chunks * 0.8), new_n_chunks - 1)
+            )
+        else:
+            chunk_i = str(random.randint(verified_n_chunks, new_n_chunks - 1))
+        bt.logging.debug(f"🔈 Querying miner [uid {i}] (chunk_{chunk_i})")
+
+        # Get the hash of the data to validate from the database.
+        db = sqlite3.connect(alloc["path"])
+        try:
+            validation_hash = (
+                db.cursor()
+                .execute(
+                    f"SELECT hash FROM DB{alloc['seed']} WHERE id=?", (chunk_i,)
+                )
+                .fetchone()[0]
+            )
+        except:
+            bt.logging.error(
+                f"❌ Failed to get validation hash for chunk_{chunk_i}"
+            )
+            return
+        db.close()
+
+        # Query the miner for the data.
+        miner_data = dendrite.query(
+            metagraph.axons[i],
+            tensorage.protocol.Retrieve(key=chunk_i),
+            deserialize=True,
+        )
+
+        if miner_data == None:
+            # The miner could not respond with the data.
+            # We reduce the estimated allocation for the miner.
+            next_allocations[i]["n_chunks"] = utils.validate_min_max_range(
+                int(next_allocations[i]["n_chunks"] * 0.9), 
+                config.miner_min_chunks,
+                config.miner_max_chunks
+            )
+            verified_allocations[i]["n_chunks"] = min(
+                next_allocations[i]["n_chunks"],
+                verified_allocations[i]["n_chunks"],
+            )
+            bt.logging.debug(
+                f"💤 Miner [uid {i}] did not respond with data, reducing allocation to: {next_allocations[i]['n_chunks']}"
+            )
+
+        else:
+            # The miner was able to respond with the data, but we need to verify it.
+            computed_hash = hashlib.sha256(miner_data.encode()).hexdigest()
+
+            # Check if the miner has provided the correct response by doubling the dummy input.
+            if computed_hash == validation_hash:
+                # The miner has provided the correct response we can increase our known verified allocation.
+                # We can also increase our estimated allocation for the miner.
+                verified_allocations[i]["n_chunks"] = next_allocations[i][
+                    "n_chunks"
+                ]
+                next_allocations[i]["n_chunks"] = utils.validate_min_max_range(
+                    int(next_allocations[i]["n_chunks"] * 1.1),
+                    config.miner_min_chunks,
+                    config.miner_max_chunks
+                )
+                bt.logging.debug(
+                    f"✅ Miner [uid {i}] provided correct response, increasing allocation to: {next_allocations[i]['n_chunks']}"
+                )
+            else:
+                # The miner has provided an incorrect response.
+                # We need to decrease our estimation..
+                next_allocations[i]["n_chunks"] = utils.validate_min_max_range(
+                    int(next_allocations[i]["n_chunks"] * 0.9),
+                    config.miner_min_chunks,
+                    config.miner_max_chunks
+                )
+                verified_allocations[i]["n_chunks"] = min(
+                    next_allocations[i]["n_chunks"],
+                    verified_allocations[i]["n_chunks"],
+                )
+                bt.logging.debug(
+                    f"👎 Miner [uid {i}] provided incorrect response, reducing allocation to: {next_allocations[i]['n_chunks']}"
+                )
 
     # Step 7: The Main Validation Loop
     bt.logging.info("🚀 Starting validator loop.")
     step = 0
     while True:
+        # Check version and restart pm2 if it's upgraded
+        utils.check_version()
+
         # Measure the time it takes to validate all the miners running on the subnet.
         start_time = time.time()
 
         try:
             # Iterate over all miners on the network and validate them.
-            for i, alloc in tqdm(enumerate(next_allocations)):
-                bt.logging.debug("🔍 Validating miner [uid {}]".format(i))
-                # Dont self validate.
-                if alloc["miner"] == wallet.hotkey.ss58_address:
-                    continue
-
-                # Select a random chunk to validate.
-                verified_n_chunks = verified_allocations[i]["n_chunks"]
-                new_n_chunks = alloc["n_chunks"]
-                if verified_n_chunks >= new_n_chunks:
-                    chunk_i = str(
-                        random.randint(int(new_n_chunks * 0.8), new_n_chunks - 1)
-                    )
-                else:
-                    chunk_i = str(random.randint(verified_n_chunks, new_n_chunks - 1))
-                bt.logging.debug(f"🔈 Querying miner [uid {i}] (chunk_{chunk_i})")
-
-                # Get the hash of the data to validate from the database.
-                db = sqlite3.connect(alloc["path"])
-                try:
-                    validation_hash = (
-                        db.cursor()
-                        .execute(
-                            f"SELECT hash FROM DB{alloc['seed']} WHERE id=?", (chunk_i,)
-                        )
-                        .fetchone()[0]
-                    )
-                except:
-                    bt.logging.error(
-                        f"❌ Failed to get validation hash for chunk_{chunk_i}"
-                    )
-                    continue
-                db.close()
-
-                # Query the miner for the data.
-                miner_data = dendrite.query(
-                    metagraph.axons[i],
-                    storage.protocol.Retrieve(key=chunk_i),
-                    deserialize=True,
-                )
-
-                if miner_data == None:
-                    # The miner could not respond with the data.
-                    # We reduce the estimated allocation for the miner.
-                    next_allocations[i]["n_chunks"] = utils.validate_min_max_range(
-                        int(next_allocations[i]["n_chunks"] * 0.9), 
-                        config.miner_min_chunks,
-                        config.miner_max_chunks
-                    )
-                    verified_allocations[i]["n_chunks"] = min(
-                        next_allocations[i]["n_chunks"],
-                        verified_allocations[i]["n_chunks"],
-                    )
-                    bt.logging.debug(
-                        f"💤 Miner [uid {i}] did not respond with data, reducing allocation to: {next_allocations[i]['n_chunks']}"
-                    )
-
-                else:
-                    # The miner was able to respond with the data, but we need to verify it.
-                    computed_hash = hashlib.sha256(miner_data.encode()).hexdigest()
-
-                    # Check if the miner has provided the correct response by doubling the dummy input.
-                    if computed_hash == validation_hash:
-                        # The miner has provided the correct response we can increase our known verified allocation.
-                        # We can also increase our estimated allocation for the miner.
-                        verified_allocations[i]["n_chunks"] = next_allocations[i][
-                            "n_chunks"
-                        ]
-                        next_allocations[i]["n_chunks"] = utils.validate_min_max_range(
-                            int(next_allocations[i]["n_chunks"] * 1.1),
-                            config.miner_min_chunks,
-                            config.miner_max_chunks
-                        )
-                        bt.logging.debug(
-                            f"✅ Miner [uid {i}] provided correct response, increasing allocation to: {next_allocations[i]['n_chunks']}"
-                        )
-                    else:
-                        # The miner has provided an incorrect response.
-                        # We need to decrease our estimation..
-                        next_allocations[i]["n_chunks"] = utils.validate_min_max_range(
-                            int(next_allocations[i]["n_chunks"] * 0.9),
-                            config.miner_min_chunks,
-                            config.miner_max_chunks
-                        )
-                        verified_allocations[i]["n_chunks"] = min(
-                            next_allocations[i]["n_chunks"],
-                            verified_allocations[i]["n_chunks"],
-                        )
-                        bt.logging.debug(
-                            f"👎 Miner [uid {i}] provided incorrect response, reducing allocation to: {next_allocations[i]['n_chunks']}"
-                        )
+            with ThreadPoolExecutor(max_workers=config.workers) as executor:
+                for i, alloc in tqdm(enumerate(next_allocations)):
+                    executor.submit(validate_miners, i, alloc)
 
             allocate.generate(
                 allocations=next_allocations,  # The allocations to generate.
@@ -368,45 +454,6 @@ def main(config):
                     score = 0
                 scores[index] = alpha * scores[index] + (1 - alpha) * score
 
-            # Periodically update the weights on the Bittensor blockchain.
-            # TODO: Define how the validator normalizes scores before setting weights.
-            weights = torch.nn.functional.normalize(scores, p=1.0, dim=0)
-            bt.logging.info(f"Setting weights:")
-            log_table(scores=weights, n_chunks_list=[alloc["n_chunks"] for alloc in verified_allocations], hotkeys=metagraph.hotkeys)
-            # This is a crucial step that updates the incentive mechanism on the Bittensor blockchain.
-            # Miners with higher scores (or weights) receive a larger share of TAO rewards on this subnet.
-            result = subtensor.set_weights(
-                netuid=config.netuid,  # Subnet to set weights on.
-                wallet=wallet,  # Wallet to sign set weights using hotkey.
-                uids=metagraph.uids,  # Uids of the miners to set weights for.
-                weights=weights,  # Weights to set for the miners.
-                # wait_for_inclusion=True,
-            )
-            if result:
-                bt.logging.success("✅ Successfully set weights.")
-                
-                if not config.no_store_weights:
-                    # TODO: Store the weights locally.
-                    # Save verified_allocations
-                    with open(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl"), 'wb') as f:
-                        pickle.dump(verified_allocations, f)
-                    bt.logging.success("✅ Successfully stored weights locally.")
-
-                    # TODO: Store the weights on wandb.
-                    # # Initialize a new run in Weights & Biases
-                    # run = wandb.init(project="salahawk/tensorage", job_type="store_data")
-                    # # Create a new artifact with timestamp
-                    # artifact = wandb.Artifact(f'verified_allocations_{int(time.time())}', type='dataset')
-                    # # Add the file to the artifact
-                    # artifact.add_file(os.path.expanduser(f"{config.db_root_path}/verified_allocations.pkl"))
-                    # # Log the artifact
-                    # run.log_artifact(artifact)
-
-                    # bt.logging.success("✅ Successfully stored weights on wandb.")
-            else:
-                bt.logging.error("❌ Failed to set weights.")
-
-
             # End the current step and prepare for the next iteration.
             step += 1
 
@@ -417,6 +464,37 @@ def main(config):
 
             # Resync our local state with the latest state from the blockchain.
             metagraph = subtensor.metagraph(config.netuid)
+
+            # Update allocations if hotkey of uid changed
+            for i, hotkey in tqdm(enumerate(metagraph.hotkeys)):
+                if next_allocations[i]["miner"] == hotkey: # No hotkey change for this uid
+                    continue
+
+                # Old Hotkey was deregistered and new Hotkey registered on this uid so reset the allocation for this uid
+                bt.logging.info(f"✨ Found new miner. Hotkey is {hotkey}")
+
+                db_path = os.path.expanduser(
+                    f"{config.db_root_path}/{config.wallet.name}/{config.wallet.hotkey}/DB-{hotkey}-{wallet.hotkey.ss58_address}"
+                )
+
+                next_allocations[i] = {
+                        "path": db_path,
+                        "n_chunks": utils.validate_min_max_range(DEFAULT_N_CHUNKS, config.miner_min_chunks, config.miner_max_chunks),
+                        "seed": f"{hotkey}{wallet.hotkey.ss58_address}",
+                        "miner": hotkey,
+                        "validator": wallet.hotkey.ss58_address,
+                        "hash": True,
+                }
+
+                verified_allocations[i] = {
+                        "path": db_path,
+                        "n_chunks": utils.validate_min_max_range(DEFAULT_N_CHUNKS, config.miner_min_chunks, config.miner_max_chunks),
+                        "seed": f"{hotkey}{wallet.hotkey.ss58_address}",
+                        "miner": hotkey,
+                        "validator": wallet.hotkey.ss58_address,
+                        "hash": True,
+                }
+
             # Wait a block step.
             time.sleep(20)
 
