@@ -17,14 +17,15 @@
 # DEALINGS IN THE SOFTWARE.
 
 # Define the version of the module.
-__version__ = "1.0.8"
+__version__ = "1.0.9"
 
-version_split = __version__.split(".")
-__spec_version__ = (
-    (1000 * int(version_split[0]))
-    + (10 * int(version_split[1]))
-    + (1 * int(version_split[2]))
-)
+def version_to_num(version):
+    version_split = version.split(".")
+    __spec_version__ = (
+        (1000 * int(version_split[0]))
+        + (10 * int(version_split[1]))
+        + (1 * int(version_split[2]))
+    )
 
 # Import all submodules.
 from . import protocol

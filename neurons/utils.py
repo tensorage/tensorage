@@ -13,16 +13,14 @@ def check_version():
     bt.logging.info(f"Current version: {current_version}")
     bt.logging.info(f"Latest version: {latest_version}")
 
-    if current_version != latest_version and latest_version != None:
+    if tensorage.version_to_num(current_version) < tensorage.version_to_num(latest_version) and latest_version != None:
         bt.logging.info("Updating to the latest version...")
         current_version = latest_version
         subprocess.run(["git", "reset", "--hard"])
         subprocess.run(["git", "pull"])
         subprocess.run(["pip", "install", "-r", "requirements.txt"])
         subprocess.run(["pip", "install", "-e", "."])
-        subprocess.run(["pip", "install", "-e", "."])
-        subprocess.run(["cd", "neurons/generate_db/"])
-        subprocess.run(["cargo", "build", "--release"])
+        subprocess.run(["neurons/generate_db/cargo", "build", "--release"])
         os._exit(0)
 
 # Get tensorage version from git repo
