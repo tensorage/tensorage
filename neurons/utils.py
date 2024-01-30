@@ -20,6 +20,8 @@ def check_version():
         subprocess.run(["git", "pull"])
         subprocess.run(["pip", "install", "-r", "requirements.txt"])
         subprocess.run(["pip", "install", "-e", "."])
+        subprocess.run(["pip", "install", "-e", "."])
+        subprocess.run(["cd", "neurons/generate_db/"])
         subprocess.run(["cargo", "build", "--release"])
         os._exit(0)
 
