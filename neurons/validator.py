@@ -191,12 +191,18 @@ def main(config):
         synapse.data = tensorage.__version__
         return synapse
         
+    async def retrieve(synapse: tensorage.protocol.Retrieve) -> tensorage.protocol.Retrieve:
+        # Result
+        my_subnet_uid = metagraph.hotkeys.index(wallet.hotkey.ss58_address)
+        synapse.data = f"I am a validator on SN 7! UID: {my_subnet_uid}"
+        return synapse
+
     axon = bt.axon(config=config, wallet=wallet)
     bt.logging.info(f"Axon {axon}")
 
     # Attach determiners which functions are called when servicing a request.
     bt.logging.info(f"Attaching forward function to axon.")
-    axon.attach(ping)
+    axon.attach(ping).attach(retrieve)
 
     # Serve passes the axon information to the network + netuid we are hosting on.
     # This will auto-update if the axon port of external ip have changed.
