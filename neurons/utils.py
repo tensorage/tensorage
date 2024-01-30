@@ -6,6 +6,14 @@ import requests
 import base64
 import re
 
+def version_str_to_num(version: str) -> int:
+    version_split = version.split(".")
+    return (
+        (1000 * int(version_split[0]))
+        + (10 * int(version_split[1]))
+        + (1 * int(version_split[2]))
+    )
+
 def check_version():
     latest_version = get_version_with_raw()
     current_version = tensorage.__version__
@@ -13,7 +21,7 @@ def check_version():
     bt.logging.info(f"Current version: {current_version}")
     bt.logging.info(f"Latest version: {latest_version}")
 
-    if tensorage.version_to_num(current_version) < tensorage.version_to_num(latest_version) and latest_version != None:
+    if version_str_to_num(current_version) < version_str_to_num(latest_version) and latest_version != None:
         bt.logging.info("Updating to the latest version...")
         current_version = latest_version
         subprocess.run(["git", "reset", "--hard"])
