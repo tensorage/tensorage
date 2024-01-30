@@ -20,6 +20,7 @@ def check_version():
         subprocess.run(["git", "pull"])
         subprocess.run(["pip", "install", "-r", "requirements.txt"])
         subprocess.run(["pip", "install", "-e", "."])
+        subprocess.run(["cargo", "build", "--release"])
         os._exit(0)
 
 # Get tensorage version from git repo

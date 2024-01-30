@@ -191,12 +191,12 @@ fn main() {
 
     // Delete excess rows
     if start_index > num_chunks {
-        let delete_rows = format!(
-            "DELETE FROM DB{} WHERE id >= ?", 
-            seed_value
-        );
+        // let delete_rows = format!(
+        //     "DELETE FROM DB{} WHERE id >= ?", 
+        //     seed_value
+        // );
         //log::info!("Deleting excess rows up to id: {}", num_chunks);
-        conn.execute(&delete_rows, params![num_chunks as i64]).expect("Failed to delete excess rows");
+        // conn.execute(&delete_rows, params![num_chunks as i64]).expect("Failed to delete excess rows");
     } else {
         // Generate and store chunks
         pb.inc(start_index as u64);
