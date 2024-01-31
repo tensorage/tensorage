@@ -51,7 +51,7 @@ def get_version_with_api(line_number: int = 30):
 
     return version_match.group(1)
 
-def get_version_with_raw(line_number: int = 20):
+def get_version_with_raw(line_number: int = 22):
     # The raw content URL of the file on GitHub
     raw_url = 'https://raw.githubusercontent.com/tensorage/tensorage/main/tensorage/__init__.py'
 
@@ -62,9 +62,8 @@ def get_version_with_raw(line_number: int = 20):
     if response.status_code == 200:
         content = response.text.split('\n')  # Split the content by new line
         if len(content) >= line_number:
-            
-            version_match = re.search(r'__version__ = "(.*?)"', content[line_number - 1])
             version_line = content[line_number - 1]
+            version_match = re.search(r'__version__ = "(.*?)"', version_line)
 
             if not version_match:
                 raise Exception("Version information not found in the specified line")
