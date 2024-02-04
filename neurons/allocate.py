@@ -26,7 +26,7 @@ def get_config() -> bt.config:
         help="Path to the data database.",
     )
     parser.add_argument(
-        "--netuid", type=int, default=1, required=False, help="Netuid to rebase into"
+        "--netuid", type=int, default=7, required=False, help="Netuid to rebase into"
     )
     parser.add_argument(
         "--threshold",
