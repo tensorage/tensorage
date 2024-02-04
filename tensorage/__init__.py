@@ -19,7 +19,7 @@
 # Define the version of the module.
 from utils import version_str_to_num
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 __spec_version__ = version_str_to_num(__version__)
 
