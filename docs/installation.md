@@ -57,14 +57,14 @@ python3 neurons/allocate.py
     --wallet.hotkey <OPTIONAL: your validator hotkey, defautl = default> # Must be created using the bittensor-cli, btcli new_hotkey
     --no_prompt <OPTIONAL: does not wait for user input to confirm the allocation, default = False> # If true, the partitioning process will not wait for user input to confirm the allocation.
     --restart <OPTIONAL: restart the partitioning process from the beginning, otherwise restarts from the last created chunk. default = False> # If true, the partitioning process restarts instead using a checkpoint.
-    --workers <OPTIONAL: number of concurrent workers to use, default = 10> # The number of concurrent workers to use to generate the partition.
+    --workers <OPTIONAL: number of concurrent workers to use, default = 256> # The number of concurrent workers to use to generate the partition.
     --subtensor.network <OPTIONAL: the bittensor chain endpoint, default = finney, local, test> # The chain endpoint to use to generate the partition.
     --logging.debug <OPTIONAL: run in debug mode, default = False> # If true, the partitioning process will run in debug mode.
     --validator <OPTIONAL: run the partitioning process as a validator, default = False> # If true, the partitioning process will run as a validator.
 ```
 
 ## Register your hotkey
-You can find steps here on [Officiail Bittensor Documentation](https://docs.bittensor.com/subnets/register-and-participate])
+You can find steps here on [Official Bittensor Documentation](https://docs.bittensor.com/subnets/register-and-participate])
 
 ## Mining
 
