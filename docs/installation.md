@@ -64,7 +64,7 @@ python3 neurons/allocate.py
 ```
 
 ## Register your hotkey
-You can find steps here on (Officiail Bittensor Documentation)[https://docs.bittensor.com/subnets/register-and-participate]
+You can find steps here on [Officiail Bittensor Documentation](https://docs.bittensor.com/subnets/register-and-participate])
 
 ## Mining
 
