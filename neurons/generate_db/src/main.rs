@@ -116,7 +116,13 @@ fn main() {
 
     // Create a new SQLite connection
     let conn = Connection::open(path).expect("Failed to open database");
-    let _result = conn.execute("PRAGMA journal_mode=WAL", params![]);
+    conn.execute("PRAGMA journal_mode=WAL", params![]);
+    // maximum DB size is `page_size` * `max_page_count` = 32MB * 33554432 = 1PB
+    // default value of `max_page_count` is 1073741823
+    // default value of `page_size` is 4096 (4M)
+    conn.execute("PRAGMA page_size=32768 ", params![]); // set page_size to 32MB
+    // conn.execute("PRAGMA max_page_count=33554432", params![]); // set max_page_count to 33554432
+
     let seed_value = matches.value_of("seed").unwrap();
     
     if matches.is_present("delete") {
