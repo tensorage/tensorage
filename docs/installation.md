@@ -50,7 +50,7 @@ docker-compose up --detach
 ## Allocating (not required, but recommended for miners)
 ```bash
 python3 neurons/allocate.py
-    --db_path <OPTIONAL: path where you want the DB files stored, default = ~/bittensor-db>  # This is where the partition will be created storing network data.
+    --db_root_path <OPTIONAL: path where you want the DB files stored, default = ~/bittensor-db>  # This is where the partition will be created storing network data.
     --netuid <OPTIONAL: the subnet netuid, defualt = 7> # This is the netuid of the storage subnet you are serving on.
     --threshold <OPTIONAL: threshold i.e. 0.9, default =  0.9>  # The threshold for the partitioning algorithm which is the maximum amount of space the miner can use based on available.
     --wallet.name <OPTIONAL: your miner wallet, default = default> # Must be created using the bittensor-cli, btcli new_coldkey
