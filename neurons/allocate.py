@@ -136,8 +136,9 @@ def run_rust_generate(alloc, restart=False):
         os.makedirs(os.path.dirname(db_path))
 
     # Construct the command to run the Rust script. The command includes the path to the script, the path to the database, the number of chunks, the size of each chunk, and the seed for the random number generator.
+    bin_path = "./target/release/storer_db_project"
     cmd = [
-        "./target/release/storer_db_project",
+        bin_path,
         "--path",
         db_path,
         "--n",
@@ -161,6 +162,9 @@ def run_rust_generate(alloc, restart=False):
     cargo_directory = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "generate_db"
     )
+
+    if not os.path.isfile(os.path.joinc(cargo_directory, bin_path)):
+        bt.loggin.error(f"The rust binary in {cargo_directory} do not exist!")
 
     # Run the command in the cargo directory. The output of the command is not captured.
     result = subprocess.run(cmd, cwd=cargo_directory, capture_output=False, text=True)
