@@ -163,8 +163,8 @@ def run_rust_generate(alloc, restart=False):
         os.path.dirname(os.path.abspath(__file__)), "generate_db"
     )
 
-    if not os.path.isfile(os.path.joinc(cargo_directory, bin_path)):
-        bt.loggin.error(f"The rust binary in {cargo_directory} do not exist!")
+    if not os.path.isfile(os.path.join(cargo_directory, bin_path)):
+        bt.logging.error(f"The rust binary in {cargo_directory} do not exist!")
 
     # Run the command in the cargo directory. The output of the command is not captured.
     result = subprocess.run(cmd, cwd=cargo_directory, capture_output=False, text=True)
