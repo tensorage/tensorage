@@ -230,8 +230,12 @@ def main(config):
             db = get_db_connection(allocations[synapse.dendrite.hotkey])
             cursor = db.cursor()
 
+            id_number = int(key)
+            id_nearest = id_number // 10
+            number_remainder = id_number - id_nearest
+
             # Fetch data from SQLite databases
-            query = f"SELECT data FROM DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey} WHERE id='{key}'"
+            query = f"SELECT data FROM DB{wallet.hotkey.ss58_address}{synapse.dendrite.hotkey} WHERE id='{id_nearest}'"
             cursor.execute(query)
             data_value = cursor.fetchone()
 
