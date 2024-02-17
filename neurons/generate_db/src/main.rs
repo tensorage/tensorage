@@ -11,6 +11,8 @@ use clap::{App, Arg};
 use sha2::{Sha256, Digest};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use rand::distributions::Alphanumeric;
+use std::fs;
+use std::path::Path;
 
 struct ChunkGenerator {
     seed: [u8; 32],
@@ -114,14 +116,26 @@ fn main() {
     let num_chunks: usize = matches.value_of("n").unwrap().parse().expect("Failed to parse number of chunks");
     let chunk_size: usize = matches.value_of("size").unwrap().parse().expect("Failed to parse chunk size");
 
+    // Check if the database file exists and delete it if it does
+    if matches.is_present("delete") {
+        if Path::new(path).exists() {
+            match fs::remove_file(path) {
+                Ok(_) => println!("Existing database file deleted."),
+                Err(e) => println!("Error deleting database file: {:?}", e),
+            }
+        }
+    }
+
     // Create a new SQLite connection
     let conn = Connection::open(path).expect("Failed to open database");
-    conn.execute("PRAGMA journal_mode=WAL", params![]);
-    // maximum DB size is `page_size` * `max_page_count` = 32MB * 33554432 = 1PB
+    // maximum DB size is `page_size` * `max_page_count` = 32KB * 1073741823 = 32TB
     // default value of `max_page_count` is 1073741823
-    // default value of `page_size` is 4096 (4M)
-    conn.execute("PRAGMA page_size=32768 ", params![]); // set page_size to 32MB
-    // conn.execute("PRAGMA max_page_count=33554432", params![]); // set max_page_count to 33554432
+    // default value of `page_size` is 4096 (4K)
+    conn.execute("PRAGMA page_size=32768;", params![]); // set page_size to 32KB
+    // conn.execute("PRAGMA max_page_count=34359738368", params![]); // set max_page_count to 33554432
+    conn.execute("PRAGMA journal_mode=WAL;", params![]);
+    // VACUUM the database
+    conn.execute("VACUUM;", params![]);
 
     let seed_value = matches.value_of("seed").unwrap();
     
