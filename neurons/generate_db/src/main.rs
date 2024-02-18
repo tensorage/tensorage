@@ -235,18 +235,33 @@ fn main() {
 
             if hash {
                 // Store only the hash.
-                conn.execute(
+                let res = conn.execute(
                     &insert_sql, 
                     params![i as i64, "", hash_hex, "F", chunk_gen.seed.to_vec()]
-                ).expect("Failed to insert into database");
+                );
+                match res {
+                    Ok(_) => pb.inc(1),
+                    Err(rusqlite::Error::SqliteFailure(err, _)) if err.code == rusqlite::ErrorCode::DiskFull => {
+                        println!("Allocation for DB{:?} is completed", seed_value);
+                        break;
+                    },
+                    Err(err) => panic!("Failed to insert into database: {:?}", err),
+                }
             } else {
                 // Store all the data.
-                conn.execute(
+                let res = conn.execute(
                     &insert_sql, 
                     params![i as i64, chunk_data, hash_hex, "F", chunk_gen.seed.to_vec()]
-                ).expect("Failed to insert into database");
-            }
-            pb.inc(1);
+                );
+                match res {
+                    Ok(_) => pb.inc(1),
+                    Err(rusqlite::Error::SqliteFailure(err, _)) if err.code == rusqlite::ErrorCode::DiskFull => {
+                        println!("Allocation for DB{:?} is completed", seed_value);
+                        break;
+                    },
+                    Err(err) => panic!("Failed to insert into database: {:?}", err),
+                }
+            };
         };
         pb.finish();
 
