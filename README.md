@@ -123,11 +123,11 @@ You can find step-by-step guideline [here...](./docs/installation.md)
 
 Minimum device requirement
 
-`'For miner'`
-- 1 TB of Hard Disk (It can be less depends on your needs), 4 GB of RAM, 8 CPUs
+`For miner`
+- 1 TB of Hard Disk, 4 GB of RAM, 8 vCPUs
 
-`'For validator'`
-- 500 GB of Hard Disk, 8 GB of RAM, 128 CPUs
+`For validator`
+- 500 GB of Hard Disk, 8 GB of RAM, 64 vCPUs
 
 # License
 This repository is licensed under the MIT License.
