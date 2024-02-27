@@ -188,7 +188,7 @@ def main(config):
     # The axon handles request processing, allowing validators to send this process requests.
     async def ping(synapse: tensorage.protocol.Ping) -> tensorage.protocol.Ping:
         # Send current version 
-        synapse.data = tensorage.__version__
+        synapse.data = f"vali-{tensorage.__version__}"
         return synapse
         
     async def retrieve(synapse: tensorage.protocol.Retrieve) -> tensorage.protocol.Retrieve:

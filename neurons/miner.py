@@ -271,7 +271,8 @@ def main(config):
         return synapse
 
     async def ping(synapse: tensorage.protocol.Ping) -> tensorage.protocol.Ping:
-        synapse.data = "OK"
+        # Send current version 
+        synapse.data = f"miner-{tensorage.__version__}"
         return synapse
 
     # Step 5: Build and link miner functions to the axon.
