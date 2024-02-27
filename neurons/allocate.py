@@ -42,12 +42,6 @@ def get_config() -> bt.config:
         help="Allocate as a validator",
     )
     parser.add_argument(
-        "--no_prompt",
-        action="store_true",
-        default=False,
-        help="Does not wait for user input to confirm the allocation.",
-    )
-    parser.add_argument(
         "--restart", action="store_true", default=False, help="Restart the db."
     )
     parser.add_argument(
@@ -57,9 +51,14 @@ def get_config() -> bt.config:
         default=256,
         help="Number of concurrent workers to use.",
     )
-    bt.wallet.add_args(parser)
+    # Adds subtensor specific arguments i.e. --subtensor.chain_endpoint ... --subtensor.network ...
     bt.subtensor.add_args(parser)
+    # Adds logging specific arguments i.e. --logging.debug ..., --logging.trace .. or --logging.logging_dir ...
     bt.logging.add_args(parser)
+    # Adds wallet specific arguments i.e. --wallet.name ..., --wallet.hotkey ./. or --wallet.path ...
+    bt.wallet.add_args(parser)
+    
+    
     return bt.config(parser)
 
 
@@ -388,7 +387,6 @@ def allocate(
 
 def main(config):
     bt.logging(config=config)
-    bt.logging.info(config)
     sub = bt.subtensor(config=config)
     wallet = bt.wallet(config=config)
     metagraph = sub.metagraph(netuid=config.netuid)
@@ -412,5 +410,7 @@ def main(config):
 
 
 if __name__ == "__main__":
+    bt.logging.info("starting allocation...")
     config = get_config()
+    bt.logging.info("config: ", config)
     main(config)
