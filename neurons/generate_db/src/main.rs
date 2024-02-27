@@ -120,8 +120,8 @@ fn main() {
     if matches.is_present("delete") {
         if Path::new(path).exists() {
             match fs::remove_file(path) {
-                Ok(_) => println!("Existing database file deleted."),
-                Err(e) => println!("Error deleting database file: {:?}", e),
+                Ok(_) => println!("Existing database file {:?} deleted.", path),
+                Err(e) => println!("Error deleting database file {:?}: {:?}", path, e),
             }
         }
     }
