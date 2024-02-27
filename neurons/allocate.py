@@ -13,7 +13,8 @@ import bittensor as bt
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
-CHUNK_SIZE = 1 << 22    # 4 MB
+CHUNK_SIZE = 1 << 22  # 4 MB
+
 
 def get_config() -> bt.config:
     parser = argparse.ArgumentParser(
@@ -57,8 +58,7 @@ def get_config() -> bt.config:
     bt.logging.add_args(parser)
     # Adds wallet specific arguments i.e. --wallet.name ..., --wallet.hotkey ./. or --wallet.path ...
     bt.wallet.add_args(parser)
-    
-    
+
     return bt.config(parser)
 
 
@@ -249,7 +249,9 @@ def verify(data_allocations, hash_allocations):
             # Compute the hash of the fetched data.
             # computed_hash = hashlib.sha256(data_value[0].encode("utf-8")).hexdigest()
             try:
-                computed_hash = hashlib.sha256(data_value[0].encode("utf-8")).hexdigest()
+                computed_hash = hashlib.sha256(
+                    data_value[0].encode("utf-8")
+                ).hexdigest()
             except:
                 computed_hash = hashlib.sha256(data_value[0]).hexdigest()
 
@@ -304,28 +306,36 @@ def allocate(
     bt.logging.info(f"restart: {restart}")
     # Delete all databases if restart flag is true
     if restart:
-        if os.path.exists(db_root_path):
+        if os.path.exists(wallet_db_path):
             try:
-                shutil.rmtree(db_root_path)
-                bt.logging.info(f"Folder '{db_root_path}' and its contents successfully deleted.")
+                shutil.rmtree(wallet_db_path)
+                bt.logging.info(
+                    f"Folder '{wallet_db_path}' and its contents successfully deleted."
+                )
             except OSError as e:
                 bt.logging.error(f"Error: {e}")
-    
+
     else:
-        if not os.path.exists(os.path.join(db_root_path, 'info.pkl')):
-            bt.logging.info("Previous allocation details not found. Allocation starts from the ground.")
+        if not os.path.exists(os.path.join(db_root_path, f"info_{wallet.hotkey.ss58_address}.pkl")):
+            bt.logging.info(
+                "Previous allocation details not found. Allocation starts from the ground."
+            )
         else:
             # Load the value set in info.pkl file in db_root_path
             try:
-                with open(os.path.join(db_root_path, 'info.pkl'), 'rb') as f:
+                with open(os.path.join(db_root_path, f"info_{wallet.hotkey.ss58_address}.pkl"), "rb") as f:
                     info = pickle.load(f)
-                    available_space = info['mining_space']
-                    bt.logging.info(f"Previous allocation details found - {human_readable_size(available_space)}.")
+                    available_space = info["mining_space"]
+                    bt.logging.info(
+                        f"Previous allocation details found - {human_readable_size(available_space)}."
+                    )
 
             except (FileNotFoundError, EOFError, pickle.UnpicklingError):
-                bt.logging.info("Failed to load previous allocation details. Allocation starts from the ground.")
+                bt.logging.info(
+                    "Failed to load previous allocation details. Allocation starts from the ground."
+                )
                 raise
-    
+
     # Calculate the available space of the directory
     if available_space == 0:
         # Calculate the path to the wallet database.
@@ -336,8 +346,8 @@ def allocate(
         available_space = get_available_space(wallet_db_path)
 
         # Save the available space in info.pkl file in db_root_path
-        with open(os.path.join(db_root_path, 'info.pkl'), 'wb') as f:
-            info = {'mining_space': available_space}
+        with open(os.path.join(db_root_path, f"info_{wallet.hotkey.ss58_address}.pkl"), "wb") as f:
+            info = {"mining_space": available_space}
             pickle.dump(info, f)
 
     # Calculate the filling space based on the available space and the threshold.
@@ -387,8 +397,8 @@ def allocate(
 
 def main(config):
     bt.logging(config=config)
-    sub = bt.subtensor(config=config)
     wallet = bt.wallet(config=config)
+    sub = bt.subtensor(config=config)
     metagraph = sub.metagraph(netuid=config.netuid)
     db_root_path = os.path.expanduser(config.db_root_path)
     allocations = allocate(
@@ -397,6 +407,7 @@ def main(config):
         metagraph=metagraph,
         threshold=config.threshold,
         hash=config.validator,
+        restart=config.restart
     )
     bt.logging.info(f"Allocations: {json.dumps(allocations, indent=4)}")
     generate(
