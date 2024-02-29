@@ -1,6 +1,7 @@
 # The MIT License (MIT)
 # Copyright © 2023 Yuma Rao
-# Copyright © 2023 salahawk
+# Copyright © 2023 salahawk <tylermcguy@gmail.com>
+# Copyright © 2024 Naked Snake <naked-snake-18>
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
@@ -16,12 +17,9 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-# Define the version of the module.
-from utils import version_str_to_num
-
-__version__ = "1.1.3"
-
-__spec_version__ = version_str_to_num(__version__)
-
 # Import all submodules.
 from . import protocol
+
+# Define the version of the module.
+__version__ = "1.2.0"
+__spec_version__ = 120

@@ -1,6 +1,7 @@
 # The MIT License (MIT)
 # Copyright © 2023 Yuma Rao
 # Copyright © 2023 salahawk <tylermcguy@gmail.com>
+# Copyright © 2024 Naked Snake <naked-snake-18>
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
@@ -22,8 +23,9 @@ from bittensor.synapse import Synapse
 
 
 class Store(bt.Synapse):
-    # Key of Data.
+    # Key of data.
     key: int = -1
+
     # String encoded data.
     data: str = ""
 
@@ -33,15 +35,18 @@ class Store(bt.Synapse):
     def deserialize(self) -> int:
         return self.key
 
+
 class Ping(bt.Synapse):
     data: str = ""
+
     def deserialize(self) -> str:
         return self.data
 
+
 class Retrieve(bt.Synapse):
     # Key of data.
-    key_list: dict = {}
-    key: str = ""
+    key: int = -1
+
     # String encoded data.
     data: typing.Optional[str] = None
 

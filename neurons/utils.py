@@ -1,90 +1,87 @@
+# The MIT License (MIT)
+# Copyright © 2023 Yuma Rao
+# Copyright © 2023 salahawk <tylermcguy@gmail.com>
+# Copyright © 2024 Naked Snake <naked-snake-18>
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+
 import os
-import tensorage
-import bittensor as bt
-import subprocess
-import requests
-import base64
 import re
+import requests
+import subprocess
+import bittensor as bt
+
+# Import this repository.
+import tensorage
+
 
 def version_str_to_num(version: str) -> int:
+    """
+    Convert version number as string to number (1.2.0 => 120).
+    Multiply the first version number by one hundred, the second by ten, and the last by one. Finally add them all.
+
+    Args:
+        - version (str): The version number as string.
+
+    Returns:
+        - int: Version number as int.
+    """
     version_split = version.split(".")
-    return (
-        (1000 * int(version_split[0]))
-        + (10 * int(version_split[1]))
-        + (1 * int(version_split[2]))
-    )
+    return (100 * int(version_split[0])) + (10 * int(version_split[1])) + int(version_split[2])
+
 
 def check_version():
-    latest_version = get_version_with_raw()
+    """
+    Check current version of the module on GitHub. If it is greater than the local version, download and update the module.
+    """
+    latest_version = get_latest_version()
     current_version = tensorage.__version__
 
-    bt.logging.info(f"Current version: {current_version}")
-    bt.logging.info(f"Latest version: {latest_version}")
-
+    # If version in GitHub is greater, update module.
     if version_str_to_num(current_version) < version_str_to_num(latest_version) and latest_version is not None:
         bt.logging.info("Updating to the latest version...")
-        current_version = latest_version
         subprocess.run(["git", "reset", "--hard"], cwd=os.getcwd())
         subprocess.run(["git", "pull"], cwd=os.getcwd())
         subprocess.run(["pip", "install", "-r", "requirements.txt"], cwd=os.getcwd())
         subprocess.run(["pip", "install", "-e", "."], cwd=os.getcwd())
         subprocess.run(["cargo", "build", "--release"], cwd=os.path.join(os.getcwd(), "neurons/generate_db"))
-        os._exit(0)
+        exit(0)
 
-# Get tensorage version from git repo
-def get_version_with_api(line_number: int = 30):
-    url = "https://api.github.com/repos/tensorage/tensorage/contents/tensorage/__init__.py"
-    response = requests.get(url, timeout=10)
-    if not response.ok:
-        return None
 
-    content = response.json()['content']
-    decoded_content = base64.b64decode(content).decode('utf-8')
-    lines = decoded_content.split('\n')
-    if line_number > len(lines):
-        raise Exception("Line number exceeds file length")
+def get_latest_version() -> str:
+    """
+    Retrieve latest version number from GitHub repository..
 
-    version_line = lines[line_number - 11]
-    version_match = re.search(r'__version__ = "(.*?)"', version_line)
-    if not version_match:
-        raise Exception("Version information not found in the specified line")
+    Returns:
+        - str: Version number as string (X.X.X).
+    """
 
-    return version_match.group(1)
+    # The raw content URL of the file on GitHub.
+    url = 'https://raw.githubusercontent.com/tensorage/tensorage/main/tensorage/__init__.py'
 
-def get_version_with_raw(line_number: int = 22):
-    # The raw content URL of the file on GitHub
-    raw_url = 'https://raw.githubusercontent.com/tensorage/tensorage/main/tensorage/__init__.py'
+    # Send an HTTP GET request to the raw content URL.
+    response = requests.get(url)
 
-    # Send an HTTP GET request to the raw content URL
-    response = requests.get(raw_url)
-
-    # Check if the request was successful
+    # Check if the request was successful.
     if response.status_code == 200:
-        content = response.text.split('\n')  # Split the content by new line
-        if len(content) >= line_number:
-            version_line = content[line_number - 1]
-            version_match = re.search(r'__version__ = "(.*?)"', version_line)
+        version_match = re.search(r'__version__ = "(.*?)"', response.text)
 
-            if not version_match:
-                raise Exception("Version information not found in the specified line")
-            return version_match.group(1)
-        else:
-            bt.logging.error(f"The file has only {len(content)} lines.")
+        if not version_match:
+            raise Exception("Version information not found in the specified line")
+
+        return version_match.group(1)
+
     else:
         bt.logging.error(f"Failed to fetch file content. Status code: {response.status_code}")
-
-def validate_min_max_range(value, min_value, max_value):
-    """
-    Purpose:
-        Make sure if value is in range of min_value and max_value.
-    """
-    min_value = min(min_value, max_value)
-    max_value = max(min_value, max_value)
-
-    if value < min_value:
-        value = min_value
-    elif value > max_value:
-        value = max_value
-    
-    return value
-# end def

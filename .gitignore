@@ -74,6 +74,7 @@ docs/_build/
 # PyBuilder
 .pybuilder/
 target/
+Cargo.lock
 
 # Jupyter Notebook
 .ipynb_checkpoints

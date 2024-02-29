@@ -106,15 +106,44 @@ It's important to note that if a miner's proof of storage is not valid, it indic
 
 
 # 5. Default Configuration
-- **CHUNK_SIZE**: Default value is `1<<22`. This represents the size of a chunk in bytes. The data is partitioned into chunks of this size (4MB) for storage and retrieval.
-- **DEFAULT_N_CHUNKS**: Default value is `1<<8`. This represents the minimum number of chunks a miner should provide at least. (1GB)
-- **THRESHOLD**: Default value is `0.9`. This represents the maximum amount of space the miner can use based on available space. It's used to determine the size of the partition for data storage.
-- **db_root_path**: Default value is `'~/bittensor-db'`. This is the path where the SQLite databases for data storage and retrieval are stored.
-- **netuid**: Default value is `7`. This is the netuid of the storage subnet that the miner and validator are serving on.
+## 5.1 Allocator (allocate.py)
+- **db_root_path**: Default value is `'~/tensorage-db'`. This is the path where the SQLite databases for data storage and retrieval are stored.
+- **size_in_gb**: Default value is `100GB`. This is the default size to store data.
+- **validator**: Default value is `False`. If `True`, only generate hash DB for validators.
+- **disable_prompt**: Default value is `False`. If `True`, not wait for user input to confirm the allocation.
+- **disable_verify**: Default value is `False`. If `True`, not verify allocation data.
+- **restart**: Default value is `False`. If `True`, restart the DB.
+- **workers**: Default value is `[CPU threads]`. Number of concurrent workers to use.
+- **subtensor.network**: Default value is `'finney'`. The chain endpoint to use to generate the partition.
 - **wallet.name**: Default value is `'default'`. This is the name of the wallet used by the miner and validator.
 - **wallet.hotkey**: Default value is `'default'`. This is the hotkey of the wallet used by the miner and validator.
 
-Please note that these default values can be overridden by command-line arguments when running the miner or validator.
+## 5.2 Validator (validator.py)
+- **db_root_path**: Default value is `'~/tensorage-db'`. This is the path where the SQLite databases for data storage and retrieval are stored.
+- **workers**: Default value is `[CPU threads]`. Number of concurrent workers to use.
+- **restart**: Default value is `False`. If `True`, restart the DB.
+- **no_store_weights**: Default value is `False`. If `False`, the validator will store newly-set weights.
+- **no_restore_weights**: Default value is `False`. If `False`, the validator will keep the weights from the previous run.
+- **no_bridge**: Default value is `False`. Run without bridging to the network.
+- **logging.debug**: Default value is `False`. Run in debug mode.
+- **logging.trace**: Default value is `False`. Run in trace mode.
+- **subtensor.network**: Default value is `'finney'`. The chain endpoint to use to generate the partition.
+- **wallet.name**: Default value is `'default'`. This is the name of the wallet used by the miner and validator.
+- **wallet.hotkey**: Default value is `'default'`. This is the hotkey of the wallet used by the miner and validator.
+
+## 5.3 Miner (miner.py)
+- **db_root_path**: Default value is `'~/tensorage-db'`. This is the path where the SQLite databases for data storage and retrieval are stored.
+- **size_in_gb**: Default value is `100GB`. This is the default size to store data.
+- **seconds_per_reallocate**: Default value is `600 seconds`. This is the time between space updates based on changes to the subnet hotkeys.
+- **workers**: Default value is `[CPU threads]`. Number of concurrent workers to use.
+- **restart**: Default value is `False`. If `True`, restart the DB.
+- **logging.debug**: Default value is `False`. Run in debug mode.
+- **logging.trace**: Default value is `False`. Run in trace mode.
+- **subtensor.network**: Default value is `'finney'`. The chain endpoint to use to generate the partition.
+- **wallet.name**: Default value is `'default'`. This is the name of the wallet used by the miner and validator.
+- **wallet.hotkey**: Default value is `'default'`. This is the hotkey of the wallet used by the miner and validator.
+
+Please note that these default values can be overridden by command-line arguments when running the allocator, miner or validator.
 
 
 # 6. Deployment

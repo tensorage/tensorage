@@ -23,7 +23,7 @@ apt install python3-pip -y
 python3 -m pip install -e .
 ```
 
-### Build rust binary
+### Build Rust binary
 ```bash
 cd neurons/generate_db
 apt install rustc -y
@@ -50,91 +50,86 @@ docker-compose up --detach
 ## Allocating (not required, but recommended for miners)
 ```bash
 python3 neurons/allocate.py
-    --db_root_path <OPTIONAL: path where you want the DB files stored, default = ~/bittensor-db>  # This is where the partition will be created storing network data.
-    --netuid <OPTIONAL: the subnet netuid, defualt = 7> # This is the netuid of the storage subnet you are serving on.
-    --threshold <OPTIONAL: threshold i.e. 0.9, default =  0.9>  # The threshold for the partitioning algorithm which is the maximum amount of space the miner can use based on available.
-    --wallet.name <OPTIONAL: your miner wallet, default = default> # Must be created using the bittensor-cli, btcli new_coldkey
-    --wallet.hotkey <OPTIONAL: your validator hotkey, defautl = default> # Must be created using the bittensor-cli, btcli new_hotkey
-    --no_prompt <OPTIONAL: does not wait for user input to confirm the allocation, default = False> # If true, the partitioning process will not wait for user input to confirm the allocation.
-    --restart <OPTIONAL: restart the partitioning process from the beginning, otherwise restarts from the last created chunk. default = False> # If true, the partitioning process restarts instead using a checkpoint.
-    --workers <OPTIONAL: number of concurrent workers to use, default = 256> # The number of concurrent workers to use to generate the partition.
-    --subtensor.network <OPTIONAL: the bittensor chain endpoint, default = finney, local, test> # The chain endpoint to use to generate the partition.
-    --logging.debug <OPTIONAL: run in debug mode, default = False> # If true, the partitioning process will run in debug mode.
-    --validator <OPTIONAL: run the partitioning process as a validator, default = False> # If true, the partitioning process will run as a validator.
+    --db_root_path <OPTIONAL: path where you want the DB files stored. Default = ~/tensorage-db>  # This is where the partition will be created storing network data.
+    --size_in_gb <OPTIONAL: size_in_gb i.e. 1024. Default = 100>  # This is the default size to store data.
+    --validator <OPTIONAL: run the partitioning process as a validator. Default = False> # If True, only generate hash DB for validators.
+    --disable_prompt <OPTIONAL: does not wait for user input to confirm the allocation. Default = False> # If True, the partitioning process will not wait for user input to confirm the allocation.
+    --disable_verify <OPTIONAL: does not verify the allocated data. Default = False> # If True, the partitioning process verify all data allocated.
+    --restart <OPTIONAL: restart the partitioning process from the beginning, otherwise restarts from the last created chunk. Default = False> # If true, the partitioning process restarts instead using a checkpoint.
+    --workers <OPTIONAL: number of concurrent workers to use. Default = 256> # The number of concurrent workers to use to generate the partition.
+    --subtensor.network <OPTIONAL: the bittensor chain endpoint. Default = finney> # The chain endpoint to use to generate the partition.
+    --wallet.name <OPTIONAL: your miner wallet. Default = default> # Must be created using the bittensor-cli, btcli w new_coldkey.
+    --wallet.hotkey <OPTIONAL: your validator hotkey. Defautl = default> # Must be created using the bittensor-cli, btcli w new_hotkey.
+```
+
+Example:
+```bash
+python3 neurons/allocate.py
+    --db_root_path ~/subnet07-db
+    --size_in_gb 5000
+    --disable_verify
+    --workers 8
+    --subtensor.network local
+    --wallet.name coldkey
+    --wallet.hotkey hotkey1
 ```
 
 ## Register your hotkey
-You can find steps here on [Official Bittensor Documentation](https://docs.bittensor.com/subnets/register-and-participate])
+You can find steps here on [Official Bittensor Documentation](https://docs.bittensor.com/subnets/register-and-participate]).
+
+## Validating
+To run the validator.
+```bash
+pm2 start neurons/validator.py --name validator --interpreter python3 -- 
+    --db_root_path <OPTIONAL: path where you want the DB files stored. Default = ~/tensorage-db>  # This is where the partition will be created storing network data.
+    --restart <OPTIONAL: restart the partitioning process from the beginning, otherwise restarts from the last created chunk. Default = False> # If true, the partitioning process restarts instead using a checkpoint.
+    --workers <OPTIONAL: number of concurrent workers to use. Default = 256> # The number of concurrent workers to use to generate the partition.
+    --no_store_weights <OPTIONAL: no store the weights. Default = False> # If you don't want to store the weights on your harddrive.
+    --no_restore_weights <OPTIONAL: no store the weights. Default = False> # If you don't want to restore the weights by old runs from your harddrive.
+    --logging.debug <OPTIONAL: Run in debug mode. Default = False> # Run in debug mode.
+    --logging.trace <OPTIONAL: Run in trace mode. Default = False> # Run in trace mode.
+    --subtensor.network <OPTIONAL: the bittensor chain endpoint. Default = finney> # The chain endpoint to use to generate the partition.
+    --wallet.name <OPTIONAL: your miner wallet. Default = default> # Must be created using the bittensor-cli, btcli w new_coldkey.
+    --wallet.hotkey <OPTIONAL: your validator hotkey. Defautl = default> # Must be created using the bittensor-cli, btcli w new_hotkey.
+```
+
+Example:
+```bash
+pm2 start neurons/validator.py --name validator --interpreter python3 -- 
+    --db_root_path ~/subnet07-db
+    --workers 8
+    --logging.debug
+    --subtensor.network local
+    --wallet.name coldkey
+    --wallet.hotkey hotkey1
+```
 
 ## Mining
 
-To run the miner
+To run the miner.
 ```bash
-pm2 start neurons/miner.py --name miner --interpreter python3 -- 
-    --wallet.name <OPTIONAL: your miner wallet, default = default> # Must be created using the bittensor-cli, btcli wallet new_coldkey
-    --wallet.hotkey <OPTIONAL: your validator hotkey, defautl = default> # Must be created using the bittensor-cli btcli wallet new_hotkey
-    --db_root_path <OPTIONAL: path where you want the DB files stored, default = "~/bittensor-db">  # This is where the partition will be created storing network data.
-    --logging.debug # Run in debug mode, alternatively --logging.trace for trace mode
-    --threshold <OPTIONAL: threshold i.e. 0.9, default =  0.9>  # The threshold for the partitioning algorithm which is the maximum amount of space the miner can use based on available.
-    --netuid <OPTIONAL: the subnet netuid, defualt = 7> # This is the netuid of the storage subnet.
-    --subtensor.network local # <OPTIONAL: the bittensor chain endpoint, default = finney, local, test> : The chain endpoint to use to generate the partition.  (highly recommend running subtensor locally)
-    --steps_per_reallocate <OPTIONAL: the number of steps before reallocating, default = 1000> # The number of steps before reallocating.
-    # --restart <OPTIONAL: restart the partitioning process from the beginning, otherwise restarts from the last created chunk. default = False> # If true, the partitioning process restarts instead using a checkpoint.
+pm2 start neurons/miner.py --name miner --interpreter python3 --
+    --db_root_path <OPTIONAL: path where you want the DB files stored. Default = ~/tensorage-db>  # This is where the partition will be created storing network data.
+    --size_in_gb <OPTIONAL: size_in_gb i.e. 1024. Default = 100>  # This is the default size to store data.
+    --seconds_per_reallocate <OPTIONAL: the number of seconds before reallocating. Default = 600> # This is the time between space updates based on changes to the subnet hotkeys.
+    --restart <OPTIONAL: restart the partitioning process from the beginning, otherwise restarts from the last created chunk. Default = False> # If true, the partitioning process restarts instead using a checkpoint.
+    --workers <OPTIONAL: number of concurrent workers to use. Default = 256> # The number of concurrent workers to use to generate the partition.
+    --logging.debug <OPTIONAL: Run in debug mode. Default = False> # Run in debug mode.
+    --logging.trace <OPTIONAL: Run in trace mode. Default = False> # Run in trace mode.
+    --subtensor.network <OPTIONAL: the bittensor chain endpoint. Default = finney> # The chain endpoint to use to generate the partition.
+    --wallet.name <OPTIONAL: your miner wallet. Default = default> # Must be created using the bittensor-cli, btcli w new_coldkey.
+    --wallet.hotkey <OPTIONAL: your validator hotkey. Defautl = default> # Must be created using the bittensor-cli, btcli w new_hotkey.
 ```
 
-- Example 1 (with default values):
+Example:
 ```bash
-pm2 start neurons/miner.py --name miner --interpreter python3 -- --wallet.name default --wallet.hotkey default --logging.debug
-```
-
-- Example 2 (with custom values):
-```bash
-pm2 start neurons/miner.py --name miner --interpreter python3 -- 
-    --wallet.name default
-    --wallet.hotkey default
-    --db_root_path ~/bittensor-db
+pm2 start neurons/miner.py --name miner --interpreter python3 --
+    --db_root_path ~/subnet07-db
+    --size_in_gb 5000
+    --seconds_per_reallocate 900
+    --workers 4
     --logging.debug
-    --threshold 0.9
-    --netuid 7
     --subtensor.network local
-    --restart
-```
-
-## Validating
-
-To run the validator
-```bash
-pm2 start neurons/validator.py --name validator --interpreter python3 -- 
-    --validator
-    --no_store_weights # Optional: If you don't want to store the weights on your harddrive, default = False
-    --no_restore_weights # Optional: If you don't want to restore the weights by old runs from your harddrive, default = False
-    --logging.debug # Run in debug mode, alternatively --logging.trace for trace mode
-    --logging.trace # Run in trace mode, alternatively --logging.debug for debug mode
-    --wallet.name <OPTIONAL: your miner wallet, default = default> # Must be created using the bittensor-cli, btcli wallet new_coldkey
-    --wallet.hotkey <OPTIONAL: your validator hotkey, default = default> # Must be created using the bittensor-cli btcli wallet new_hotkey
-    --db_root_path <OPTIONAL: path where you want the DB files stored, default = "~/bittensor-db">  # This is where the partition will be created storing network data.
-    --netuid <OPTIONAL: the subnet netuid, defualt = 7> # This is the netuid of the storage subnet you are serving on.
-    --subtensor.network local # <OPTIONAL: the bittensor chain endpoint, default = finney, local, test> : The chain endpoint to use to generate the partition. (highly recommend running subtensor locally)
-    --miner_min_chunks <OPTIONAL: the minimum number of chunks miners should provide to your validator, default = 256> # The minimum number of chunks miners should provide to this validator
-    --miner_max_chunks <OPTIONAL: the maximum number of chunks miners can provide to your validator, default = 2560000000> # The maximum number of chunks miners should provide to this validator
-```
-
-- Example 1 (with default values):
-```bash
-pm2 start neurons/validator.py --name validator --interpreter python3 -- --validator --wallet.name default --wallet.hotkey default --logging.debug --logging.trace
-```
-
-- Example 2 (with custom values):
-```bash
-pm2 start neurons/validator.py --name validator --interpreter python3 -- 
-    --validator
-    --wallet.name default
-    --wallet.hotkey default
-    --db_root_path ~/bittensor-db
-    --logging.debug
-    --logging.trace
-    --netuid 7
-    --subtensor.network local
-    --miner_min_chunks 256
-    --miner_max_chunks 2560000000
+    --wallet.name coldkey
+    --wallet.hotkey hotkey2
 ```
