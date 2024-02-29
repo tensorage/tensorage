@@ -350,7 +350,7 @@ def main(config: bt.config):
 
                 # Generate new allocation.
                 db_path = os.path.join(wallet_db_path, f"DB-{own_hotkey}-{hotkey}")
-                allocations[i] = {"path": db_path, "n_chunks": DEFAULT_N_CHUNKS, "own_hotkey": own_hotkey, "hotkey": hotkey}
+                allocations[i] = {"db_path": db_path, "n_chunks": DEFAULT_N_CHUNKS, "own_hotkey": own_hotkey, "hotkey": hotkey}
                 allocate.run_rust_generate(allocations[i], only_hash=True)
 
             # Periodically update the weights on the Bittensor blockchain.
