@@ -41,12 +41,12 @@ import tensorage
 from utils import check_version
 
 ALPHA = 0.9
-STEP_TIME = 20
+STEP_TIME = 150
 SCORES_TIME = 600
 CHUNK_SIZE = 1 << 22  # 4194304 (4 MB)
-DEFAULT_N_CHUNKS = 128  # 512MB per hotkey (256 x 512MB = 128GB disk alocated)
-VALIDATION_INCREASING_RATE = 256  # 1GB
-VALIDATION_DECREASING_RATE = 64  # 256MB
+DEFAULT_N_CHUNKS = 1280  # 5GB per hotkey (256 x 512MB = 128GB disk alocated)
+VALIDATION_INCREASING_RATE = 2560  # 10GB
+VALIDATION_DECREASING_RATE = 256  # 1GB
 
 
 def get_config() -> bt.config:
@@ -302,16 +302,26 @@ def main(config: bt.config):
     step = 0
     bt.logging.info("🚀 Starting validator loop.")
     while True:
-        # Measure the time it takes to validate all the miners running on the subnet.
-        start_time = time.time()
-
         try:
+            # Prepare for the next iteration.
+            step += 1
+
+            # Measure the time it takes to validate all the miners running on the subnet.
+            start_time = time.time()
+
             # Iterate over all hotkeys on the network and validate them.
             with ThreadPoolExecutor(max_workers=config.workers) as executor:
                 [executor.submit(validate_allocation, i, allocation) for i, allocation in enumerate(allocations)]
 
             # Log the time it took to validate all miners.
-            bt.logging.info(f"Finished validation step {step} in {time.time() - start_time} seconds.")
+            elapsed_time = round(time.time() - start_time)
+            bt.logging.info(f"Finished validation step {step} in {elapsed_time} seconds.")
+
+            # Wait for validate again.
+            seconds_to_wait = STEP_TIME - elapsed_time
+            if seconds_to_wait > 0:
+                bt.logging.info(f"Waiting {seconds_to_wait} seconds for the next step.")
+                time.sleep(seconds_to_wait)
 
             if not config.no_store_weights:  # Save verified allocations.
                 with open(allocations_pkl, 'wb') as f:
@@ -373,13 +383,6 @@ def main(config: bt.config):
 
                 else:
                     bt.logging.error("❌  Failed to set weights.")
-
-            # End the current step and prepare for the next iteration.
-            step += 1
-
-            # Wait for validate again.
-            bt.logging.info(f"Waiting {STEP_TIME} seconds for the next step.")
-            time.sleep(STEP_TIME)
 
         # If we encounter an unexpected error, log it for debugging.
         except RuntimeError as e:
