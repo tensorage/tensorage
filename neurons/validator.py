@@ -317,12 +317,6 @@ def main(config: bt.config):
             elapsed_time = round(time.time() - start_time)
             bt.logging.info(f"Finished validation step {step} in {elapsed_time} seconds.")
 
-            # Wait for validate again.
-            seconds_to_wait = STEP_TIME - elapsed_time
-            if seconds_to_wait > 0:
-                bt.logging.info(f"Waiting {seconds_to_wait} seconds for the next step.")
-                time.sleep(seconds_to_wait)
-
             if not config.no_store_weights:  # Save verified allocations.
                 with open(allocations_pkl, 'wb') as f:
                     pickle.dump(allocations, f)
@@ -338,6 +332,12 @@ def main(config: bt.config):
                 # # Log the artifact
                 # run.log_artifact(artifact)
                 # bt.logging.success("✅ Successfully stored verified allocations on wandb.")
+
+            # Wait for validate again.
+            seconds_to_wait = STEP_TIME - elapsed_time
+            if seconds_to_wait > 0:
+                bt.logging.info(f"Waiting {seconds_to_wait} seconds for the next step.")
+                time.sleep(seconds_to_wait)
 
             # Resync our local state with the latest state from the blockchain.
             metagraph = subtensor.metagraph(config.netuid)
