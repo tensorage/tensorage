@@ -64,7 +64,7 @@ python3 neurons/allocate.py
 Example:
 ```bash
 python3 neurons/allocate.py
-    --db_root_path ~/subnet07-db
+    --db_root_path ~/tensorage-db
     --size_in_gb 5000
     --disable_verify
     --workers 8
@@ -95,7 +95,7 @@ pm2 start neurons/validator.py --name validator --interpreter python3 --
 Example:
 ```bash
 pm2 start neurons/validator.py --name validator --interpreter python3 -- 
-    --db_root_path ~/subnet07-db
+    --db_root_path ~/tensorage-db
     --workers 8
     --logging.debug
     --subtensor.network local
@@ -123,7 +123,7 @@ pm2 start neurons/miner.py --name miner --interpreter python3 --
 Example:
 ```bash
 pm2 start neurons/miner.py --name miner --interpreter python3 --
-    --db_root_path ~/subnet07-db
+    --db_root_path ~/tensorage-db
     --size_in_gb 5000
     --seconds_per_reallocate 900
     --workers 4
