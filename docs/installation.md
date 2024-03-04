@@ -41,11 +41,7 @@ apt install docker-compose -y
 ```
 
 ### Run Subtensor locally
-```bash
-git clone https://github.com/opentensor/subtensor.git
-cd subtensor
-docker-compose up --detach
-```
+You can find steps here on https://github.com/opentensor/subtensor.
 
 ## Allocating (not required, but recommended for miners)
 ```bash
@@ -67,7 +63,6 @@ python3 neurons/allocate.py
     --db_root_path ~/tensorage-db
     --size_in_gb 5000
     --disable_verify
-    --workers 8
     --subtensor.network local
     --wallet.name coldkey
     --wallet.hotkey hotkey1
@@ -96,7 +91,6 @@ Example:
 ```bash
 pm2 start neurons/validator.py --name validator --interpreter python3 -- 
     --db_root_path ~/tensorage-db
-    --workers 8
     --logging.debug
     --subtensor.network local
     --wallet.name coldkey
@@ -126,7 +120,6 @@ pm2 start neurons/miner.py --name miner --interpreter python3 --
     --db_root_path ~/tensorage-db
     --size_in_gb 5000
     --seconds_per_reallocate 900
-    --workers 4
     --logging.debug
     --subtensor.network local
     --wallet.name coldkey
