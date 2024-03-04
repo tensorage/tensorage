@@ -124,7 +124,6 @@ It's important to note that if a miner's proof of storage is not valid, it indic
 - **restart**: Default value is `False`. If `True`, restart the DB.
 - **no_store_weights**: Default value is `False`. If `False`, the validator will store newly-set weights.
 - **no_restore_weights**: Default value is `False`. If `False`, the validator will keep the weights from the previous run.
-- **no_bridge**: Default value is `False`. Run without bridging to the network.
 - **logging.debug**: Default value is `False`. Run in debug mode.
 - **logging.trace**: Default value is `False`. Run in trace mode.
 - **subtensor.network**: Default value is `'finney'`. The chain endpoint to use to generate the partition.

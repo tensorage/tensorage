@@ -63,7 +63,6 @@ def get_config() -> bt.config:
     parser.add_argument("--workers", default=multiprocessing.cpu_count(), type=int, help="The number of concurrent workers to use for hash generation.")
     parser.add_argument("--no_store_weights", action="store_true", default=False, help="If False, the validator will store newly-set weights.")
     parser.add_argument("--no_restore_weights", action="store_true", default=False, help="If False, the validator will keep the weights from the previous run.")
-    parser.add_argument("--no_bridge", action="store_true", help="Run without bridging to the network.")
 
     # Override default netuid.
     parser.add_argument("--netuid", type=int, default=7, help="Netuid to rebase into.")
@@ -167,29 +166,26 @@ def main(config: bt.config):
         synapse.data = f"I am a validator on SN 7! UID: {metagraph.hotkeys.index(wallet.hotkey.ss58_address)}"
         return synapse
 
-    # Connect the validator to the network.
-    axon = None
-    if not config.no_bridge:
-        # Check if hotkey is registered.
-        if wallet.hotkey.ss58_address not in metagraph.hotkeys:
-            bt.logging.error(f"\nYour validator: {wallet} if not registered to chain connection: {subtensor} \nRun btcli register and try again.")
-            exit()
+    # Check if hotkey is registered.
+    if wallet.hotkey.ss58_address not in metagraph.hotkeys:
+        bt.logging.error(f"\nYour validator: {wallet} if not registered to chain connection: {subtensor} \nRun btcli register and try again.")
+        exit()
 
-        # The axon handles request processing, allowing validators to send this process requests.
-        axon = bt.axon(config=config, wallet=wallet)
-        bt.logging.info(f"Axon {axon}")
+    # The axon handles request processing, allowing validators to send this process requests.
+    axon = bt.axon(config=config, wallet=wallet)
+    bt.logging.info(f"Axon {axon}")
 
-        # Attach determiners which functions are called when servicing a request.
-        bt.logging.info(f"Attaching functions to axon.")
-        axon.attach(ping).attach(retrieve)
+    # Attach determiners which functions are called when servicing a request.
+    bt.logging.info(f"Attaching functions to axon.")
+    axon.attach(ping).attach(retrieve)
 
-        # Serve passes the axon information to the network + netuid we are hosting on. This will auto-update if the axon port of external ip have changed.
-        bt.logging.info(f"Serving axon 'ping' and 'retrieve' on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}")
-        axon.serve(netuid=config.netuid, subtensor=subtensor)
+    # Serve passes the axon information to the network + netuid we are hosting on. This will auto-update if the axon port of external ip have changed.
+    bt.logging.info(f"Serving axon 'ping' and 'retrieve' on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}")
+    axon.serve(netuid=config.netuid, subtensor=subtensor)
 
-        # Start starts the validator's axon, making it active on the network.
-        bt.logging.info(f"Starting axon server on port: {config.axon.port}")
-        axon.start()
+    # Start starts the validator's axon, making it active on the network.
+    bt.logging.info(f"Starting axon server on port: {config.axon.port}")
+    axon.start()
 
     # Set up initial scoring weights for validation.
     bt.logging.info("Building validation weights.")
@@ -372,15 +368,11 @@ def main(config: bt.config):
                 log_table(scores=weights, n_chunks_list=[allocation['n_chunks'] for allocation in allocations], hotkeys=metagraph.hotkeys)
 
                 # This is a crucial step that updates the incentive mechanism on the Bittensor blockchain. Miners with higher scores (or weights) receive a larger share of TAO rewards on this subnet.
-                if not config.no_bridge:
-                    if subtensor.set_weights(netuid=config.netuid, wallet=wallet, uids=metagraph.uids, weights=weights):
-                        bt.logging.success("✅  Successfully set weights.")
-
-                    else:
-                        bt.logging.error("❌  Failed to set weights.")
+                if subtensor.set_weights(netuid=config.netuid, wallet=wallet, uids=metagraph.uids, weights=weights):
+                    bt.logging.success("✅  Successfully set weights.")
 
                 else:
-                    bt.logging.warning("👎  Not set weights due no bridge network.")
+                    bt.logging.error("❌  Failed to set weights.")
 
             # End the current step and prepare for the next iteration.
             step += 1
@@ -396,8 +388,7 @@ def main(config: bt.config):
 
         # If the user interrupts the program, gracefully exit.
         except KeyboardInterrupt:
-            if not config.no_bridge:
-                axon.stop()
+            axon.stop()
             bt.logging.success("Keyboard interrupt detected. Exiting validator.")
             exit()
 

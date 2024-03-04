@@ -52,7 +52,6 @@ docker-compose up --detach
 python3 neurons/allocate.py
     --db_root_path <OPTIONAL: path where you want the DB files stored. Default = ~/tensorage-db>  # This is where the partition will be created storing network data.
     --size_in_gb <OPTIONAL: size_in_gb i.e. 1024. Default = 100>  # This is the default size to store data.
-    --validator <OPTIONAL: run the partitioning process as a validator. Default = False> # If True, only generate hash DB for validators.
     --disable_prompt <OPTIONAL: does not wait for user input to confirm the allocation. Default = False> # If True, the partitioning process will not wait for user input to confirm the allocation.
     --disable_verify <OPTIONAL: does not verify the allocated data. Default = False> # If True, the partitioning process verify all data allocated.
     --restart <OPTIONAL: restart the partitioning process from the beginning, otherwise restarts from the last created chunk. Default = False> # If true, the partitioning process restarts instead using a checkpoint.

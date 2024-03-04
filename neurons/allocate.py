@@ -48,7 +48,6 @@ def get_config() -> bt.config:
     parser = argparse.ArgumentParser(description="Configure the database generation.")
     parser.add_argument("--db_root_path", default="~/tensorage-db", help="Path to the data database.")
     parser.add_argument("--size_in_gb", type=float, default=MIN_SIZE_IN_GB, help="Size of path to fill.")
-    parser.add_argument("--validator", action="store_true", default=False, help="If True, only generate hash DB for validators.")
     parser.add_argument("--disable_prompt", action="store_true", default=False, help="Does not wait for user input to confirm the allocation.")
     parser.add_argument("--disable_verify", action="store_true", default=False, help="Does not verify allocation data.")
     parser.add_argument("--restart", action="store_true", default=False, help="Restart the DB.")
@@ -70,7 +69,7 @@ def get_config() -> bt.config:
     config = bt.config(parser)
 
     # Ensure the logging directory exists.
-    config.full_path = os.path.join(os.path.expanduser(config.logging.logging_dir), config.wallet.name, config.wallet.hotkey, f"netuid{config.netuid}", "validator" if config.only_hash else "miner")
+    config.full_path = os.path.join(os.path.expanduser(config.logging.logging_dir), config.wallet.name, config.wallet.hotkey, f"netuid{config.netuid}", "miner")
     if not os.path.exists(config.full_path):
         os.makedirs(config.full_path, exist_ok=True)
 
@@ -127,7 +126,7 @@ def confirm_generation(allocations: typing.List[dict]) -> bool:
     return input().lower() in ['yes", "y']
 
 
-def allocate(db_root_path: str, wallet: bt.wallet, metagraph: bt.metagraph, size_in_gb: float = MIN_SIZE_IN_GB, only_hash: bool = False, restart: bool = False) -> typing.List[dict]:
+def allocate(db_root_path: str, wallet: bt.wallet, metagraph: bt.metagraph, size_in_gb: float = MIN_SIZE_IN_GB, restart: bool = False) -> typing.List[dict]:
     """
     This function calculates the allocation of space for each hotkey in the metagraph.
 
@@ -136,7 +135,6 @@ def allocate(db_root_path: str, wallet: bt.wallet, metagraph: bt.metagraph, size
         - wallet (bt.wallet): The wallet object containing the name and hotkey.
         - metagraph (bt.metagraph): The metagraph object containing the hotkeys.
         - size_in_gb (float): The size for the allocation.
-        - only_hash (bool): If True, only generate hash DB for validators.
         - restart (bool): If True, it deletes all allocation before start.
 
     Returns:
@@ -144,7 +142,7 @@ def allocate(db_root_path: str, wallet: bt.wallet, metagraph: bt.metagraph, size
     """
 
     # DB directory.
-    wallet_db_path = os.path.expanduser(os.path.join(db_root_path, wallet.name, wallet.hotkey_str, "validator" if only_hash else "miner"))
+    wallet_db_path = os.path.expanduser(os.path.join(db_root_path, wallet.name, wallet.hotkey_str, "miner"))
 
     # Delete all DBs if restart flag is true.
     if restart:
@@ -250,7 +248,7 @@ def run_rust_generate(allocation: dict, only_hash: bool = False, capture_output:
 
     # If there is an error message in the output of the command, log an error message.
     if result.stderr:
-        bt.logging.error(f"Failed to generate database: {db_path}")
+        bt.logging.error(f"Failed to generate database: {allocation['db_path']}")
 
 
 def verify(allocations):
@@ -315,15 +313,15 @@ def main(config: bt.config):
     metagraph = subtensor.metagraph(netuid=config.netuid)
 
     # Allocation.
-    allocations = allocate(db_root_path=config.db_root_path, wallet=wallet, metagraph=metagraph, size_in_gb=config.size_in_gb, only_hash=config.validator, restart=config.restart)
+    allocations = allocate(db_root_path=config.db_root_path, wallet=wallet, metagraph=metagraph, size_in_gb=config.size_in_gb, restart=config.restart)
 
     # Generation.
     start = dt.now()
-    generate(allocations=allocations, disable_prompt=config.disable_prompt, only_hash=config.validator, workers=config.workers, capture_output=False)
+    generate(allocations=allocations, disable_prompt=config.disable_prompt, workers=config.workers, capture_output=False)
     bt.logging.info(f"Time elapsed: ({str((dt.now() - start).total_seconds())}s)")
 
     # Verification.
-    if not config.validator and not config.disable_verify:
+    if not config.disable_verify:
         verify(allocations)
 
 
