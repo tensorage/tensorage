@@ -53,18 +53,14 @@ with open(path.join(here, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
 # loading version from setup.py
-with codecs.open(
-    os.path.join(here, "tensorage/__init__.py"), encoding="utf-8"
-) as init_file:
-    version_match = re.search(
-        r"^__version__ = ['\"]([^'\"]*)['\"]", init_file.read(), re.M
-    )
+with codecs.open(os.path.join(here, "tensorage/__init__.py"), encoding="utf-8") as init_file:
+    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]", init_file.read(), re.M)
     version_string = version_match.group(1)
 
 setup(
-    name="storage-subnet",
+    name="tensorage",
     version=version_string,
-    description="storage-subnet on bittensor",
+    description="Tensorage on Bittensor.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/tensorage/tensorage",
@@ -90,5 +86,5 @@ setup(
         "Topic :: Software Development",
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Python Modules",
-    ],
+    ]
 )

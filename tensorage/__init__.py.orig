@@ -17,6 +17,16 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+<<<<<<< HEAD
+=======
+# Define the version of the module.
+from utils import version_str_to_num
+
+__version__ = "1.1.4"
+
+__spec_version__ = version_str_to_num(__version__)
+
+>>>>>>> main
 # Import all submodules.
 from . import protocol
 
