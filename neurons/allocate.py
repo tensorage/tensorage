@@ -142,7 +142,7 @@ def allocate(db_root_path: str, wallet: bt.wallet, metagraph: bt.metagraph, size
     """
 
     # DB directory.
-    wallet_db_path = os.path.expanduser(os.path.join(db_root_path, wallet.name, wallet.hotkey_str, "miner"))
+    wallet_db_path = os.path.join(os.path.expanduser(db_root_path), wallet.name, wallet.hotkey_str, "miner")
 
     # Delete all DBs if restart flag is true.
     if restart:

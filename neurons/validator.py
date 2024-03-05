@@ -192,7 +192,7 @@ def main(config: bt.config):
     scores = torch.ones_like(metagraph.S, dtype=torch.float32)
 
     # Set DBs directory.
-    wallet_db_path = os.path.join(config.db_root_path, config.wallet.name, config.wallet.hotkey, "validator")
+    wallet_db_path = os.path.join(os.path.expanduser(config.db_root_path), config.wallet.name, config.wallet.hotkey, "validator")
 
     # Delete all DBs if restart flag is true.
     if config.restart:
