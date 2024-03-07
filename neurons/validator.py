@@ -259,6 +259,7 @@ def main(config: bt.config):
         """
         # Don't self validate and skip 0.0.0.0 axons.
         if allocation['hotkey'] == own_hotkey or metagraph.axons[i].ip == "0.0.0.0":
+            allocation["n_chunks"] = 0
             return
 
         # Init hashes to compare.
@@ -269,8 +270,14 @@ def main(config: bt.config):
         chunk_i = 0 if allocation['n_chunks'] < 2 else randint(max(0, allocation['n_chunks'] - VALIDATION_DECREASING_RATE), allocation['n_chunks'] - 1)
 
         # Query the miner for the data. TODO: Add timeout param and solve "Timeout context manager should be used inside a task" error.
-        miner_data = bt.dendrite(wallet=wallet).query(metagraph.axons[i], tensorage.protocol.Retrieve(key=chunk_i), deserialize=True)
+        response = bt.dendrite(wallet=wallet).query(metagraph.axons[i], tensorage.protocol.Retrieve(key=chunk_i), deserialize=False)
 
+        if response is None:
+            allocation["n_chunks"] = 0
+            bt.logging.debug(f"Request for miner [uid {i}] has timed out. Setting allocation to zero.")
+            return
+
+        miner_data = response.data
         # If the miner can respond with the data, we need to verify it.
         if miner_data is not None:
             # Calculate hash of data received.
@@ -282,21 +289,25 @@ def main(config: bt.config):
                 validation_hash = db.cursor().execute(f"SELECT hash FROM DB{allocation['own_hotkey']}{allocation['hotkey']} WHERE id = {chunk_i}").fetchone()[0]
 
             except Exception as e:
-                bt.logging.error(f"❌ Failed to get validation hash for chunk_{chunk_i} in file {allocation['db_path']}: {e}")
+                bt.logging.debug(f"❌ Failed to get validation hash for chunk_{chunk_i} in file {allocation['db_path']}: {e}")
                 return
             db.close()
 
-        # Check if the miner has provided the correct response.
-        if computed_hash == validation_hash:
-            # The miner has provided the correct response. We can increase our known verified allocation and our estimated allocation for the miner.
-            allocation['n_chunks'] = int(chunk_i + VALIDATION_INCREASING_RATE)
-            bt.logging.success(f"✅ Miner [uid {i}] provided correct chunk_{chunk_i}. Increasing allocation to: {allocation['n_chunks']}.")
-            allocate.run_rust_generate(allocation, only_hash=True)
+            # Check if the miner has provided the correct response.
+            if computed_hash == validation_hash:
+                # The miner has provided the correct response. We can increase our known verified allocation and our estimated allocation for the miner.
+                allocation['n_chunks'] = int(chunk_i + VALIDATION_INCREASING_RATE)
+                bt.logging.success(f"✅ Miner [uid {i}] provided correct chunk_{chunk_i}. Increasing allocation to: {allocation['n_chunks']}.")
+                allocate.run_rust_generate(allocation, only_hash=True)
 
+            else:
+                # The miner has provided an incorrect response. We need to decrease our estimation.
+                allocation['n_chunks'] = max(chunk_i - VALIDATION_DECREASING_RATE, 1)
+                bt.logging.debug(f"❌ Miner [uid {i}] provided incorrect chunk_{chunk_i}. Reducing allocation to: {allocation['n_chunks']}.")
         else:
-            # The miner has provided an incorrect response. We need to decrease our estimation.
             allocation['n_chunks'] = max(chunk_i - VALIDATION_DECREASING_RATE, 1)
-            bt.logging.error(f"❌ Miner [uid {i}] provided incorrect chunk_{chunk_i}. Reducing allocation to: {allocation['n_chunks']}.")
+            bt.logging.debug(f"❌ Miner [uid {i}] has not provided response for key {chunk_i}. Reducing allocation to: {allocation['n_chunks']}.")
+
 
     # The main validation Loop.
     step = 0
