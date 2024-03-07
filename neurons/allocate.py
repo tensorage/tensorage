@@ -172,20 +172,21 @@ def allocate(db_root_path: str, wallet: bt.wallet, metagraph: bt.metagraph, size
 
     # Get the own hotkey from the wallet.
     own_hotkey = wallet.hotkey.ss58_address
-
+    validator_hotkeys = [hotkey for i, hotkey in enumerate(metagraph.hotkeys) if metagraph.validator_permit[i] > 0]
+    
     # Calculate the size of the database for each hotkey.
-    db_size = filling_space / len(metagraph.hotkeys)
+    db_size = filling_space / len(validator_hotkeys)
 
     # Calculate the number of chunks for each database.
     n_chunks = max(int(db_size / CHUNK_SIZE), 1)
 
     # Initialize an empty list to store the allocations.
-    allocations = [{"db_path": os.path.join(wallet_db_path, f"DB-{own_hotkey}-{hotkey}"), "n_chunks": n_chunks, "own_hotkey": own_hotkey, "hotkey": hotkey} for hotkey in metagraph.hotkeys]
+    allocations = [{"db_path": os.path.join(wallet_db_path, f"DB-{own_hotkey}-{hotkey}"), "n_chunks": n_chunks, "own_hotkey": own_hotkey, "hotkey": hotkey} for hotkey in validator_hotkeys]
 
     # Delete old database if hotkey is not registered.
     for filename in os.listdir(wallet_db_path):
         hotkey = filename.replace(f"DB-{own_hotkey}-", "")
-        if hotkey not in metagraph.hotkeys:
+        if hotkey not in validator_hotkeys:
             os.remove(os.path.join(wallet_db_path, filename))
 
     # Return the allocations list.

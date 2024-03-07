@@ -392,7 +392,7 @@ def main(config: bt.config):
         # If the user interrupts the program, gracefully exit.
         except KeyboardInterrupt:
             axon.stop()
-            bt.logging.success("Keyboard interrupt detected. Exiting validator.")
+            bt.logging.info("Keyboard interrupt detected. Exiting validator.")
             exit()
 
         # Check version and restart PM2 if it's upgraded.
