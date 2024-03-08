@@ -356,7 +356,9 @@ def main(config: bt.config):
         response_times[i] = response.dendrite.process_time
 
         # Handle time-out
-        if response is None or (hasattr(response, 'status_code') and response.status_code == 408):
+        if response is None or (
+            hasattr(response, "status_code") and response.status_code == 408
+        ):
             allocation["n_chunks"] = 0
             bt.logging.debug(
                 f"Request for miner [uid {i}] has timed out. Setting allocation to zero."
@@ -480,10 +482,13 @@ def main(config: bt.config):
                         "own_hotkey": own_hotkey,
                         "hotkey": hotkey,
                     }
-                else:   # If new hotkey has been added to metagraph (not all 256 slots are filled up)
+                else:  # If new hotkey has been added to metagraph (not all 256 slots are filled up)
+                    bt.logging.info(f"✨ Found new hotkey {hotkey} at uid {i}:")
                     allocations.append(
                         {
-                            "db_path": os.path.join(wallet_db_path, f"DB-{own_hotkey}-{hotkey}"),
+                            "db_path": os.path.join(
+                                wallet_db_path, f"DB-{own_hotkey}-{hotkey}"
+                            ),
                             "n_chunks": DEFAULT_N_CHUNKS,
                             "own_hotkey": own_hotkey,
                             "hotkey": hotkey,
@@ -496,16 +501,28 @@ def main(config: bt.config):
             if step % int(SCORES_TIME / STEP_TIME) == 0:
                 # Calculate score with n_chunks of allocations.
                 for index, uid in enumerate(metagraph.uids):
+                    max_time = max(response_times)
+                    min_time = min(response_times)
+
                     try:
                         allocation_index = next(
                             i
                             for i, obj in enumerate(allocations)
                             if obj["hotkey"] == metagraph.neurons[uid].axon_info.hotkey
                         )
-                        score = allocations[allocation_index]["n_chunks"]
+                        chunks = allocations[allocation_index]["n_chunks"]
+                        seconds = response_times[allocation_index]
 
                     except StopIteration:
-                        score = 0
+                        chunks = 0
+                        seconds = max_time
+
+                    time_reward = (
+                        (seconds - min_time) / (max_time - min_time)
+                        if max_time != min_time
+                        else 1
+                    ) + 1
+                    score = chunks / time_reward if time_reward > 0 else chunks
 
                     scores[index] = ALPHA * scores[index] + (1 - ALPHA) * score
 
