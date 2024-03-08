@@ -21,5 +21,5 @@
 from . import protocol
 
 # Define the version of the module.
-__version__ = "1.2.0"
-__spec_version__ = 120
+__version__ = "1.2.1"
+__spec_version__ = 121
