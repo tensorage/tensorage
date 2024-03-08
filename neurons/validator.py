@@ -47,6 +47,8 @@ CHUNK_SIZE = 1 << 22  # 4194304 (4 MB)
 DEFAULT_N_CHUNKS = 1280  # 5GB per hotkey (256 x 512MB = 128GB disk alocated)
 VALIDATION_INCREASING_RATE = 2560  # 10GB
 VALIDATION_DECREASING_RATE = 256  # 1GB
+DEFAULT_TIMEOUT = 12
+DEFAULT_RESPONSE_TIME = 20
 
 
 def get_config() -> bt.config:
@@ -345,10 +347,13 @@ def main(config: bt.config):
         response = bt.dendrite(wallet=wallet).query(
             metagraph.axons[i],
             tensorage.protocol.Retrieve(key=chunk_i),
+            timeout=DEFAULT_TIMEOUT,
             deserialize=False,
         )
+        response_time = response.dendrite.process_time
 
-        if response is None:
+        # Handle time-out
+        if response is None or (hasattr(response, 'status_code') and response.status_code == 408):
             allocation["n_chunks"] = 0
             bt.logging.debug(
                 f"Request for miner [uid {i}] has timed out. Setting allocation to zero."
