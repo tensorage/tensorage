@@ -61,7 +61,7 @@ def get_config() -> bt.config:
     # Create parser and add all params.
     parser = argparse.ArgumentParser(description="Configure the validator.")
     parser.add_argument(
-        "--db_root_path", default="~/tensorage-db", help="Path to the data database."
+        "--db_root_path", default="~/tensorage-db", help="Path to the database."
     )
     parser.add_argument(
         "--restart",
@@ -285,6 +285,7 @@ def main(config: bt.config):
 
     # Generate allocations for the validator.
     allocations = []
+    response_times = [DEFAULT_RESPONSE_TIME] * len(metagraph.hotkeys)
     for hotkey in metagraph.hotkeys:
         # Look for old verified allocations for current hotkey.
         n_chunks = DEFAULT_N_CHUNKS
@@ -324,6 +325,8 @@ def main(config: bt.config):
             - i (int): Index of enumerated list "allocations".
             - allocation (dict): A dictionary containing allocation details.
         """
+        response_times[i] = DEFAULT_RESPONSE_TIME
+
         # Don't self validate and skip 0.0.0.0 axons.
         if allocation["hotkey"] == own_hotkey or metagraph.axons[i].ip == "0.0.0.0":
             allocation["n_chunks"] = 0
@@ -350,7 +353,7 @@ def main(config: bt.config):
             timeout=DEFAULT_TIMEOUT,
             deserialize=False,
         )
-        response_time = response.dendrite.process_time
+        response_times[i] = response.dendrite.process_time
 
         # Handle time-out
         if response is None or (hasattr(response, 'status_code') and response.status_code == 408):
@@ -458,24 +461,35 @@ def main(config: bt.config):
 
             # Update allocations if hotkey of uid change.
             for i, hotkey in enumerate(metagraph.hotkeys):
-                # No hotkey change for this uid.
-                if allocations[i]["hotkey"] == hotkey:
-                    continue
+                if i < len(allocations):
+                    # No hotkey change for this uid.
+                    if allocations[i]["hotkey"] == hotkey:
+                        continue
 
-                # Old hotkey was deregistered and new hotkey registered on this uid so reset the allocation for this uid.
-                bt.logging.info(f"✨ Found new hotkey: {hotkey}.")
+                    # Old hotkey was deregistered and new hotkey registered on this uid so reset the allocation for this uid.
+                    bt.logging.info(f"✨ Found new hotkey: {hotkey}.")
 
-                # Delete old DB file.
-                os.remove(allocations[i]["db_path"])
+                    # Delete old DB file.
+                    os.remove(allocations[i]["db_path"])
 
-                # Generate new allocation.
-                db_path = os.path.join(wallet_db_path, f"DB-{own_hotkey}-{hotkey}")
-                allocations[i] = {
-                    "db_path": db_path,
-                    "n_chunks": DEFAULT_N_CHUNKS,
-                    "own_hotkey": own_hotkey,
-                    "hotkey": hotkey,
-                }
+                    # Generate new allocation.
+                    db_path = os.path.join(wallet_db_path, f"DB-{own_hotkey}-{hotkey}")
+                    allocations[i] = {
+                        "db_path": db_path,
+                        "n_chunks": DEFAULT_N_CHUNKS,
+                        "own_hotkey": own_hotkey,
+                        "hotkey": hotkey,
+                    }
+                else:   # If new hotkey has been added to metagraph (not all 256 slots are filled up)
+                    allocations.append(
+                        {
+                            "db_path": os.path.join(wallet_db_path, f"DB-{own_hotkey}-{hotkey}"),
+                            "n_chunks": DEFAULT_N_CHUNKS,
+                            "own_hotkey": own_hotkey,
+                            "hotkey": hotkey,
+                        }
+                    )
+
                 allocate.run_rust_generate(allocations[i], only_hash=True)
 
             # Periodically update the weights on the Bittensor blockchain.
