@@ -39,7 +39,11 @@ def version_str_to_num(version: str) -> int:
         - int: Version number as int.
     """
     version_split = version.split(".")
-    return (100 * int(version_split[0])) + (10 * int(version_split[1])) + int(version_split[2])
+    return (
+        (100 * int(version_split[0]))
+        + (10 * int(version_split[1]))
+        + int(version_split[2])
+    )
 
 
 def check_version():
@@ -50,13 +54,19 @@ def check_version():
     current_version = tensorage.__version__
 
     # If version in GitHub is greater, update module.
-    if version_str_to_num(current_version) < version_str_to_num(latest_version) and latest_version is not None:
+    if (
+        version_str_to_num(current_version) < version_str_to_num(latest_version)
+        and latest_version is not None
+    ):
         bt.logging.info("Updating to the latest version...")
         subprocess.run(["git", "reset", "--hard"], cwd=os.getcwd())
         subprocess.run(["git", "pull"], cwd=os.getcwd())
         subprocess.run(["pip", "install", "-r", "requirements.txt"], cwd=os.getcwd())
         subprocess.run(["pip", "install", "-e", "."], cwd=os.getcwd())
-        subprocess.run(["cargo", "build", "--release"], cwd=os.path.join(os.getcwd(), "neurons/generate_db"))
+        subprocess.run(
+            ["cargo", "build", "--release"],
+            cwd=os.path.join(os.getcwd(), "neurons/generate_db"),
+        )
         exit(0)
 
 
@@ -69,7 +79,7 @@ def get_latest_version() -> str:
     """
 
     # The raw content URL of the file on GitHub.
-    url = 'https://raw.githubusercontent.com/tensorage/tensorage/main/tensorage/__init__.py'
+    url = "https://raw.githubusercontent.com/tensorage/tensorage/main/tensorage/__init__.py"
 
     # Send an HTTP GET request to the raw content URL.
     response = requests.get(url)
@@ -84,4 +94,15 @@ def get_latest_version() -> str:
         return version_match.group(1)
 
     else:
-        bt.logging.error(f"Failed to fetch file content. Status code: {response.status_code}")
+        bt.logging.error(
+            f"Failed to fetch file content. Status code: {response.status_code}"
+        )
+
+
+# check whether a certain hotkey is validator or not
+def is_validator(metagraph, hotkey) -> bool:
+    try:
+        uid = metagraph.hotkeys.index(hotkey)
+        return metagraph.validator_permit[uid]
+    except ValueError:
+        return False

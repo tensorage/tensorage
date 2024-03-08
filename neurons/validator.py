@@ -47,6 +47,8 @@ CHUNK_SIZE = 1 << 22  # 4194304 (4 MB)
 DEFAULT_N_CHUNKS = 1280  # 5GB per hotkey (256 x 512MB = 128GB disk alocated)
 VALIDATION_INCREASING_RATE = 2560  # 10GB
 VALIDATION_DECREASING_RATE = 256  # 1GB
+DEFAULT_TIMEOUT = 12
+DEFAULT_RESPONSE_TIME = 20
 
 
 def get_config() -> bt.config:
@@ -58,11 +60,33 @@ def get_config() -> bt.config:
     """
     # Create parser and add all params.
     parser = argparse.ArgumentParser(description="Configure the validator.")
-    parser.add_argument("--db_root_path", default="~/tensorage-db", help="Path to the data database.")
-    parser.add_argument("--restart", action="store_true", default=False, help="If set, the validator will reallocate its DB entirely.")
-    parser.add_argument("--workers", default=multiprocessing.cpu_count(), type=int, help="The number of concurrent workers to use for hash generation.")
-    parser.add_argument("--no_store_weights", action="store_true", default=False, help="If False, the validator will store newly-set weights.")
-    parser.add_argument("--no_restore_weights", action="store_true", default=False, help="If False, the validator will keep the weights from the previous run.")
+    parser.add_argument(
+        "--db_root_path", default="~/tensorage-db", help="Path to the database."
+    )
+    parser.add_argument(
+        "--restart",
+        action="store_true",
+        default=False,
+        help="If set, the validator will reallocate its DB entirely.",
+    )
+    parser.add_argument(
+        "--workers",
+        default=multiprocessing.cpu_count(),
+        type=int,
+        help="The number of concurrent workers to use for hash generation.",
+    )
+    parser.add_argument(
+        "--no_store_weights",
+        action="store_true",
+        default=False,
+        help="If False, the validator will store newly-set weights.",
+    )
+    parser.add_argument(
+        "--no_restore_weights",
+        action="store_true",
+        default=False,
+        help="If False, the validator will keep the weights from the previous run.",
+    )
 
     # Override default netuid.
     parser.add_argument("--netuid", type=int, default=7, help="Netuid to rebase into.")
@@ -83,14 +107,25 @@ def get_config() -> bt.config:
     config = bt.config(parser)
 
     # Ensure the logging directory exists.
-    config.full_path = os.path.join(os.path.expanduser(config.logging.logging_dir), config.wallet.name, config.wallet.hotkey, f"netuid{config.netuid}", "validator")
+    config.full_path = os.path.join(
+        os.path.expanduser(config.logging.logging_dir),
+        config.wallet.name,
+        config.wallet.hotkey,
+        f"netuid{config.netuid}",
+        "validator",
+    )
     if not os.path.exists(config.full_path):
         os.makedirs(config.full_path, exist_ok=True)
 
     return config
 
 
-def log_table(scores: torch.Tensor, n_chunks_list: typing.List[int], hotkeys: typing.List[str], title: str = "Score"):
+def log_table(
+    scores: torch.Tensor,
+    n_chunks_list: typing.List[int],
+    hotkeys: typing.List[str],
+    title: str = "Score",
+):
     """
     It shows a score table to console.
 
@@ -108,7 +143,10 @@ def log_table(scores: torch.Tensor, n_chunks_list: typing.List[int], hotkeys: ty
     table.add_column("N. Chunks", justify="right", style="cyan")
 
     # Add each row of data.
-    [table.add_row(str(i), str(score), str(hotkeys[i]), str(n_chunks_list[i])) for i, score in enumerate(scores)]
+    [
+        table.add_row(str(i), str(score), str(hotkeys[i]), str(n_chunks_list[i]))
+        for i, score in enumerate(scores)
+    ]
 
     # Show table in default console.
     console = Console()
@@ -124,7 +162,9 @@ def main(config: bt.config):
     """
     # Set up logging with the provided configuration and directory.
     bt.logging(config=config, logging_dir=config.full_path)
-    bt.logging.info(f"Running validator for subnet: {config.netuid} on network: {config.subtensor.chain_endpoint} with config:")
+    bt.logging.info(
+        f"Running validator for subnet: {config.netuid} on network: {config.subtensor.chain_endpoint} with config:"
+    )
 
     # The wallet holds the cryptographic key pairs for the validator.
     wallet = bt.wallet(config=config)
@@ -153,7 +193,9 @@ def main(config: bt.config):
         return synapse
 
     # Returns a default message if any other validator requests data.
-    async def retrieve(synapse: tensorage.protocol.Retrieve) -> tensorage.protocol.Retrieve:
+    async def retrieve(
+        synapse: tensorage.protocol.Retrieve,
+    ) -> tensorage.protocol.Retrieve:
         """
         Answer the call indicating that it's a validator and its UID.
 
@@ -168,7 +210,9 @@ def main(config: bt.config):
 
     # Check if hotkey is registered.
     if wallet.hotkey.ss58_address not in metagraph.hotkeys:
-        bt.logging.error(f"\nYour validator: {wallet} if not registered to chain connection: {subtensor} \nRun btcli register and try again.")
+        bt.logging.error(
+            f"\nYour validator: {wallet} if not registered to chain connection: {subtensor} \nRun btcli register and try again."
+        )
         exit()
 
     # The axon handles request processing, allowing validators to send this process requests.
@@ -180,7 +224,9 @@ def main(config: bt.config):
     axon.attach(ping).attach(retrieve)
 
     # Serve passes the axon information to the network + netuid we are hosting on. This will auto-update if the axon port of external ip have changed.
-    bt.logging.info(f"Serving axon 'ping' and 'retrieve' on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}")
+    bt.logging.info(
+        f"Serving axon 'ping' and 'retrieve' on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}"
+    )
     axon.serve(netuid=config.netuid, subtensor=subtensor)
 
     # Start starts the validator's axon, making it active on the network.
@@ -192,7 +238,12 @@ def main(config: bt.config):
     scores = torch.ones_like(metagraph.S, dtype=torch.float32)
 
     # Set DBs directory.
-    wallet_db_path = os.path.join(os.path.expanduser(config.db_root_path), config.wallet.name, config.wallet.hotkey, "validator")
+    wallet_db_path = os.path.join(
+        os.path.expanduser(config.db_root_path),
+        config.wallet.name,
+        config.wallet.hotkey,
+        "validator",
+    )
 
     # Delete all DBs if restart flag is true.
     if config.restart:
@@ -200,13 +251,17 @@ def main(config: bt.config):
             bt.logging.info(f"Restarting...")
             try:
                 shutil.rmtree(wallet_db_path)
-                bt.logging.info(f"Folder '{wallet_db_path}' and its contents successfully deleted.")
+                bt.logging.info(
+                    f"Folder '{wallet_db_path}' and its contents successfully deleted."
+                )
 
             except OSError as e:
                 bt.logging.error(f"Error: {e}")
 
     # Create DBs directory if not exists.
-    if not os.path.exists(wallet_db_path):  # Ensure the wallet_db_path directory exists.
+    if not os.path.exists(
+        wallet_db_path
+    ):  # Ensure the wallet_db_path directory exists.
         os.makedirs(wallet_db_path, exist_ok=True)
 
     # Load previously stored allocations.
@@ -214,7 +269,7 @@ def main(config: bt.config):
     allocations_pkl = os.path.join(wallet_db_path, "..", "validator-allocations.pkl")
     if not config.no_restore_weights:
         if os.path.exists(allocations_pkl):
-            with open(allocations_pkl, 'rb') as f:
+            with open(allocations_pkl, "rb") as f:
                 old_allocations = pickle.load(f)
 
             bt.logging.success("✅ Successfully restored previously-saved weights.")
@@ -230,15 +285,23 @@ def main(config: bt.config):
 
     # Generate allocations for the validator.
     allocations = []
+    response_times = [DEFAULT_RESPONSE_TIME] * len(metagraph.hotkeys)
     for hotkey in metagraph.hotkeys:
         # Look for old verified allocations for current hotkey.
         n_chunks = DEFAULT_N_CHUNKS
         for allocation in old_allocations:
-            if allocation['hotkey'] == hotkey:
-                n_chunks = max(1, allocation['n_chunks'])
+            if allocation["hotkey"] == hotkey:
+                n_chunks = max(1, allocation["n_chunks"])
                 break
 
-        allocations.append({"db_path": os.path.join(wallet_db_path, f"DB-{own_hotkey}-{hotkey}"), "n_chunks": n_chunks, "own_hotkey": own_hotkey, "hotkey": hotkey})
+        allocations.append(
+            {
+                "db_path": os.path.join(wallet_db_path, f"DB-{own_hotkey}-{hotkey}"),
+                "n_chunks": n_chunks,
+                "own_hotkey": own_hotkey,
+                "hotkey": hotkey,
+            }
+        )
 
     # Delete DB if hotkey is not registered.
     for filename in os.listdir(wallet_db_path):
@@ -247,7 +310,12 @@ def main(config: bt.config):
             os.remove(os.path.join(wallet_db_path, filename))
 
     # Generate the hash allocations.
-    allocate.generate(allocations=allocations, disable_prompt=True, only_hash=True, workers=config.workers)
+    allocate.generate(
+        allocations=allocations,
+        disable_prompt=True,
+        only_hash=True,
+        workers=config.workers,
+    )
 
     def validate_allocation(i: int, allocation: dict):
         """
@@ -257,8 +325,11 @@ def main(config: bt.config):
             - i (int): Index of enumerated list "allocations".
             - allocation (dict): A dictionary containing allocation details.
         """
+        response_times[i] = DEFAULT_RESPONSE_TIME
+
         # Don't self validate and skip 0.0.0.0 axons.
-        if allocation['hotkey'] == own_hotkey or metagraph.axons[i].ip == "0.0.0.0":
+        if allocation["hotkey"] == own_hotkey or metagraph.axons[i].ip == "0.0.0.0":
+            allocation["n_chunks"] = 0
             return
 
         # Init hashes to compare.
@@ -266,11 +337,35 @@ def main(config: bt.config):
         validation_hash = ""
 
         # Select first or random chunk to validate.
-        chunk_i = 0 if allocation['n_chunks'] < 2 else randint(max(0, allocation['n_chunks'] - VALIDATION_DECREASING_RATE), allocation['n_chunks'] - 1)
+        chunk_i = (
+            0
+            if allocation["n_chunks"] < 2
+            else randint(
+                max(0, allocation["n_chunks"] - VALIDATION_DECREASING_RATE),
+                allocation["n_chunks"] - 1,
+            )
+        )
 
         # Query the miner for the data. TODO: Add timeout param and solve "Timeout context manager should be used inside a task" error.
-        miner_data = bt.dendrite(wallet=wallet).query(metagraph.axons[i], tensorage.protocol.Retrieve(key=chunk_i), deserialize=True)
+        response = bt.dendrite(wallet=wallet).query(
+            metagraph.axons[i],
+            tensorage.protocol.Retrieve(key=chunk_i),
+            timeout=DEFAULT_TIMEOUT,
+            deserialize=False,
+        )
+        response_times[i] = response.dendrite.process_time
 
+        # Handle time-out
+        if response is None or (
+            hasattr(response, "status_code") and response.status_code == 408
+        ):
+            allocation["n_chunks"] = 0
+            bt.logging.debug(
+                f"Request for miner [uid {i}] has timed out. Setting allocation to zero."
+            )
+            return
+
+        miner_data = response.data
         # If the miner can respond with the data, we need to verify it.
         if miner_data is not None:
             # Calculate hash of data received.
@@ -279,24 +374,41 @@ def main(config: bt.config):
             # Get the hash of the data to validate from the database.
             db = sqlite3.connect(allocation["db_path"])
             try:
-                validation_hash = db.cursor().execute(f"SELECT hash FROM DB{allocation['own_hotkey']}{allocation['hotkey']} WHERE id = {chunk_i}").fetchone()[0]
+                validation_hash = (
+                    db.cursor()
+                    .execute(
+                        f"SELECT hash FROM DB{allocation['own_hotkey']}{allocation['hotkey']} WHERE id = {chunk_i}"
+                    )
+                    .fetchone()[0]
+                )
 
             except Exception as e:
-                bt.logging.error(f"❌ Failed to get validation hash for chunk_{chunk_i} in file {allocation['db_path']}: {e}")
+                bt.logging.debug(
+                    f"❌ Failed to get validation hash for chunk_{chunk_i} in file {allocation['db_path']}: {e}"
+                )
                 return
             db.close()
 
-        # Check if the miner has provided the correct response.
-        if computed_hash == validation_hash:
-            # The miner has provided the correct response. We can increase our known verified allocation and our estimated allocation for the miner.
-            allocation['n_chunks'] = int(chunk_i + VALIDATION_INCREASING_RATE)
-            bt.logging.success(f"✅ Miner [uid {i}] provided correct chunk_{chunk_i}. Increasing allocation to: {allocation['n_chunks']}.")
-            allocate.run_rust_generate(allocation, only_hash=True)
+            # Check if the miner has provided the correct response.
+            if computed_hash == validation_hash:
+                # The miner has provided the correct response. We can increase our known verified allocation and our estimated allocation for the miner.
+                allocation["n_chunks"] = int(chunk_i + VALIDATION_INCREASING_RATE)
+                bt.logging.success(
+                    f"✅ Miner [uid {i}] provided correct chunk_{chunk_i}. Increasing allocation to: {allocation['n_chunks']}."
+                )
+                allocate.run_rust_generate(allocation, only_hash=True)
 
+            else:
+                # The miner has provided an incorrect response. We need to decrease our estimation.
+                allocation["n_chunks"] = max(chunk_i - VALIDATION_DECREASING_RATE, 1)
+                bt.logging.debug(
+                    f"❌ Miner [uid {i}] provided incorrect chunk_{chunk_i}. Reducing allocation to: {allocation['n_chunks']}."
+                )
         else:
-            # The miner has provided an incorrect response. We need to decrease our estimation.
-            allocation['n_chunks'] = max(chunk_i - VALIDATION_DECREASING_RATE, 1)
-            bt.logging.error(f"❌ Miner [uid {i}] provided incorrect chunk_{chunk_i}. Reducing allocation to: {allocation['n_chunks']}.")
+            allocation["n_chunks"] = max(chunk_i - VALIDATION_DECREASING_RATE, 1)
+            bt.logging.debug(
+                f"❌ Miner [uid {i}] has not provided response for key {chunk_i}. Reducing allocation to: {allocation['n_chunks']}."
+            )
 
     # The main validation Loop.
     step = 0
@@ -311,16 +423,23 @@ def main(config: bt.config):
 
             # Iterate over all hotkeys on the network and validate them.
             with ThreadPoolExecutor(max_workers=config.workers) as executor:
-                [executor.submit(validate_allocation, i, allocation) for i, allocation in enumerate(allocations)]
+                [
+                    executor.submit(validate_allocation, i, allocation)
+                    for i, allocation in enumerate(allocations)
+                ]
 
             # Log the time it took to validate all miners.
             elapsed_time = round(time.time() - start_time)
-            bt.logging.info(f"Finished validation step {step} in {elapsed_time} seconds.")
+            bt.logging.info(
+                f"Finished validation step {step} in {elapsed_time} seconds."
+            )
 
             if not config.no_store_weights:  # Save verified allocations.
-                with open(allocations_pkl, 'wb') as f:
+                with open(allocations_pkl, "wb") as f:
                     pickle.dump(allocations, f)
-                bt.logging.success("✅ Successfully stored verified allocations locally.")
+                bt.logging.success(
+                    "✅ Successfully stored verified allocations locally."
+                )
 
                 # TODO: Store verified allocations on wandb.
                 # # Initialize a new run in Weights & Biases
@@ -344,41 +463,87 @@ def main(config: bt.config):
 
             # Update allocations if hotkey of uid change.
             for i, hotkey in enumerate(metagraph.hotkeys):
-                # No hotkey change for this uid.
-                if allocations[i]['hotkey'] == hotkey:
-                    continue
+                if i < len(allocations):
+                    # No hotkey change for this uid.
+                    if allocations[i]["hotkey"] == hotkey:
+                        continue
 
-                # Old hotkey was deregistered and new hotkey registered on this uid so reset the allocation for this uid.
-                bt.logging.info(f"✨ Found new hotkey: {hotkey}.")
+                    # Old hotkey was deregistered and new hotkey registered on this uid so reset the allocation for this uid.
+                    bt.logging.info(f"✨ Found new hotkey: {hotkey}.")
 
-                # Delete old DB file.
-                os.remove(allocations[i]['db_path'])
+                    # Delete old DB file.
+                    os.remove(allocations[i]["db_path"])
 
-                # Generate new allocation.
-                db_path = os.path.join(wallet_db_path, f"DB-{own_hotkey}-{hotkey}")
-                allocations[i] = {"db_path": db_path, "n_chunks": DEFAULT_N_CHUNKS, "own_hotkey": own_hotkey, "hotkey": hotkey}
+                    # Generate new allocation.
+                    db_path = os.path.join(wallet_db_path, f"DB-{own_hotkey}-{hotkey}")
+                    allocations[i] = {
+                        "db_path": db_path,
+                        "n_chunks": DEFAULT_N_CHUNKS,
+                        "own_hotkey": own_hotkey,
+                        "hotkey": hotkey,
+                    }
+                else:  # If new hotkey has been added to metagraph (not all 256 slots are filled up)
+                    bt.logging.info(f"✨ Found new hotkey {hotkey} at uid {i}:")
+                    allocations.append(
+                        {
+                            "db_path": os.path.join(
+                                wallet_db_path, f"DB-{own_hotkey}-{hotkey}"
+                            ),
+                            "n_chunks": DEFAULT_N_CHUNKS,
+                            "own_hotkey": own_hotkey,
+                            "hotkey": hotkey,
+                        }
+                    )
+
                 allocate.run_rust_generate(allocations[i], only_hash=True)
 
             # Periodically update the weights on the Bittensor blockchain.
             if step % int(SCORES_TIME / STEP_TIME) == 0:
                 # Calculate score with n_chunks of allocations.
                 for index, uid in enumerate(metagraph.uids):
+                    max_time = max(response_times)
+                    min_time = min(response_times)
+
                     try:
-                        allocation_index = next(i for i, obj in enumerate(allocations) if obj['hotkey'] == metagraph.neurons[uid].axon_info.hotkey)
-                        score = allocations[allocation_index]['n_chunks']
+                        allocation_index = next(
+                            i
+                            for i, obj in enumerate(allocations)
+                            if obj["hotkey"] == metagraph.neurons[uid].axon_info.hotkey
+                        )
+                        chunks = allocations[allocation_index]["n_chunks"]
+                        seconds = response_times[allocation_index]
 
                     except StopIteration:
-                        score = 0
+                        chunks = 0
+                        seconds = max_time
+
+                    time_reward = (
+                        (seconds - min_time) / (max_time - min_time)
+                        if max_time != min_time
+                        else 1
+                    ) + 1
+                    score = chunks / time_reward if time_reward > 0 else chunks
 
                     scores[index] = ALPHA * scores[index] + (1 - ALPHA) * score
 
                 # TODO: Define how the validator normalizes scores before setting weights.
                 weights = torch.nn.functional.normalize(scores, p=1.0, dim=0)
                 bt.logging.info("Setting weights:")
-                log_table(scores=weights, n_chunks_list=[allocation['n_chunks'] for allocation in allocations], hotkeys=metagraph.hotkeys)
+                log_table(
+                    scores=weights,
+                    n_chunks_list=[
+                        allocation["n_chunks"] for allocation in allocations
+                    ],
+                    hotkeys=metagraph.hotkeys,
+                )
 
                 # This is a crucial step that updates the incentive mechanism on the Bittensor blockchain. Miners with higher scores (or weights) receive a larger share of TAO rewards on this subnet.
-                if subtensor.set_weights(netuid=config.netuid, wallet=wallet, uids=metagraph.uids, weights=weights):
+                if subtensor.set_weights(
+                    netuid=config.netuid,
+                    wallet=wallet,
+                    uids=metagraph.uids,
+                    weights=weights,
+                ):
                     bt.logging.success("✅  Successfully set weights.")
 
                 else:
@@ -392,7 +557,7 @@ def main(config: bt.config):
         # If the user interrupts the program, gracefully exit.
         except KeyboardInterrupt:
             axon.stop()
-            bt.logging.success("Keyboard interrupt detected. Exiting validator.")
+            bt.logging.info("Keyboard interrupt detected. Exiting validator.")
             exit()
 
         # Check version and restart PM2 if it's upgraded.
