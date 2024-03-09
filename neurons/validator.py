@@ -353,7 +353,7 @@ def main(config: bt.config):
             timeout=DEFAULT_TIMEOUT,
             deserialize=False,
         )
-        response_times[i] = response.dendrite.process_time
+        response_times[i] = response.dendrite.process_time or DEFAULT_RESPONSE_TIME
 
         # Handle time-out
         if response is None or response.dendrite.status_code == 408:
@@ -492,16 +492,16 @@ def main(config: bt.config):
                             "hotkey": hotkey,
                         }
                     )
+                    response_times.append(DEFAULT_RESPONSE_TIME)
 
                 allocate.run_rust_generate(allocations[i], only_hash=True)
 
             # Periodically update the weights on the Bittensor blockchain.
             if step % int(SCORES_TIME / STEP_TIME) == 0:
+                max_time = max(response_times)
+                min_time = min(response_times)
                 # Calculate score with n_chunks of allocations.
                 for index, uid in enumerate(metagraph.uids):
-                    max_time = max(response_times)
-                    min_time = min(response_times)
-
                     try:
                         allocation_index = next(
                             i
