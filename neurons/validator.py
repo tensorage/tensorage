@@ -356,12 +356,10 @@ def main(config: bt.config):
         response_times[i] = response.dendrite.process_time
 
         # Handle time-out
-        if response is None or (
-            hasattr(response, "status_code") and response.status_code == 408
-        ):
+        if response is None or response.dendrite.status_code == 408:
             allocation["n_chunks"] = 0
             bt.logging.debug(
-                f"Request for miner [uid {i}] has timed out. Setting allocation to zero."
+                f"💤 Request for miner [uid {i}] has timed out. Setting allocation to zero."
             )
             return
 
