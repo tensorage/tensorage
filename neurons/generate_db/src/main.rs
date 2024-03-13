@@ -113,7 +113,7 @@ fn main() {
     // Create a new SQLite connection
     let conn = Connection::open(db_path).expect("Failed to open database");
     let _ = conn.execute("PRAGMA page_size=32768;", params![]); // set page_size to 32KB
-    let _ = conn.execute("PRAGMA journal_mode=OFF", params![]);
+    let _ = conn.execute("PRAGMA journal_mode=WAL", params![]);
     let _ = conn.execute("PRAGMA auto_vacuum=FULL", params![]);
 
     let create_table_sql = format!(
